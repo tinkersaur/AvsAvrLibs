@@ -1,28 +1,18 @@
-#ifndef MiniThreads_h
-#define MiniThreads_h
+#ifndef AvrScheduler_h
+#define AvrScheduler_h
 
 /**  The library for generating PWM and on several pins */
 
-
+/** Updated on 2018-10-28 */
 #include<stdint.h>
 
-/* Task modes: */
-#define ServoTask 2
-#define MotorTask 3
-#define CallbackTask 4
-#define NoTask 0 
-#define LastTask 1
-  // ^^^ End of the list of the tasks.
-  
-// The types can be accoomodated for the application needs.
-
-#define MaxNumTasks 10
-
-#define TaskIndex uint8_t 
+typedef byte TaskIndex;
   // ^^^ Must be big enough to accomodate MaxTaskIndex
-  
+
+typedef byte PinIndex;
+
 typedef unsigned long Period;
-  // ^^^ Must be big enough to contain maximum period in whatever units.
+  // ^^^ Must be big enough to contain maximum period. The time is measured in milliseconds.
 
 typedef byte Phase;
   // ^^^ A task may have several phases. For example, pin is on, or pin is off.
@@ -32,39 +22,25 @@ typedef byte Duty;
   //     The angle of the servo, or the power of the motor.
   //     By convention, 0 is 0%, and 255 is 100%.
 
-struct PwmParameters{
-    byte phase;
-    byte duty;
-    byte pin;
-    Period on_duration;
-}; 
+typedef byte Priority;
 
-struct CallbackParams{
-  void (*func)();
-  Period period;
-};
-
-union TaskParameters{
-  PwmParameters pwm;
-  CallbackParams callback;
-};
-
-struct Task{
-  uint8_t mode;
-  short wtime; // wakeup time.
-  uint8_t priority;
-  TaskParameters param;
-  TaskIndex next;
-  TaskIndex prev;
-};
-
-extern Task tasks[MaxNumTasks];
+typedef void (*TaskFunc)();
 
 void init_tasks();
 
-/** Returns a task index, or MaxNumTasks if there is not enough room. **/
+/** Use different priority for each task more preductable results. */
 
-TaskIndex add_task();
+TaskIndex add_motor_task(Priority priority, PinIndex pin, Duty initial_duty);
+
+TaskIndex add_servo_task(Priority priority, PinIndex pin, Duty initial_duty);
+
+TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func);
+
+TaskIndex add_delayed_task(Priority priority, Period task_delay, TaskFunc func);
+
+TaskIndex set_task_duty(TaskIndex id, Duty duty);
+
+TaskIndex cancel_task(Period period, TaskFunc func);
 
 void run_task();
 
