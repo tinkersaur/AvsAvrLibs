@@ -1,10 +1,12 @@
 /**  The library for generating PWM and on several pins */
 
+/** Updated on 2018-10-28 */
+
 /**
  *  Links:
  *  
- Note that PWM cannot be used for controlling servo.
- PWM has 500Hz and duty cycle 0 to 100%.
+ Note that PWM for controlling servo is different from controlling a motor.
+ PWM for motor has 500Hz and duty cycle 0 to 100%.
  Servo is controlled at 50Hz. and has a duty cycle between 1ms to 2ms.
 
  https://www.arduino.cc/en/Tutorial/SecretsOfArduinoPWM
@@ -33,9 +35,11 @@
  * TODO:
    - handle the situation when clock overflows.
    - Test if inline keyword works.
-   - Figure out which type I can used for Period.
    - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
-   - Most functions could be inlined.
+   - Add an initial delay for the callbacks.
+   - Next invocation time should be based on the designed invocation,
+     not on occured invocation. This would improve the precision.
+   - Why times are off by one?
 */
 
 #include<Arduino.h>
@@ -43,10 +47,21 @@
 #include<assert.h>
 
 #define error() Serial.print("Scheduler error at "); Serial.println(__LINE__);
-#define ENTER() Serial.print("Entering "); Serial.println(__func__); 
-#define MSG(X) Serial.println(X);
-#define TR(X) Serial.print(#X " = "); Serial.println(X);
 
+//#define TRACE
+#ifdef TRACE
+    #define ENTER() Serial.print("Entering "); Serial.println(__func__); 
+    #define LEAVE() Serial.print("Leaving "); Serial.println(__func__); 
+    #define MSG(X) Serial.println(X);
+    #define TR(X) Serial.print(#X " = "); Serial.println(X);
+    #define REPORT_TASKS() report_tasks();
+#else
+    #define ENTER()
+    #define LEAVE()
+    #define MSG(X)
+    #define TR(X)
+    #define REPORT_TASKS()
+#endif
 struct PwmParameters{
     Phase phase;
     Duty duty;
@@ -112,8 +127,25 @@ static const Ticks TicksInZeroServoDuty = 0.01 * 16e6;
 //assert(TicksInMaxMotorDuty<TicksInMotorPeriod);
 
 
-TaskIndex pop_task();
-void insert_task(TaskIndex ti);
+void reposition_first_task();
+
+void report_tasks(){
+    Serial.println("  *** Tasks ***");
+    Serial.print("next_task: ");
+    Serial.println(next_task);
+    for(TaskIndex i = 0; i < MaxNumTasks; i++){
+        if (tasks[i].mode == NoTask) break;
+        Serial.print(i);
+        Serial.print(") priority: ");
+        Serial.print(tasks[i].priority);
+        Serial.print(", wtime: ");
+        Serial.print(tasks[i].wtime);
+        Serial.print(", prev: ");
+        Serial.print(tasks[i].prev);
+        Serial.print(", next: ");
+        Serial.println(tasks[i].next);
+    }
+}
 
 void init_tasks(){
   // ENTER();
@@ -150,8 +182,7 @@ TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func){
   CallbackParameters & params = tasks[i].params.callback;
   params.func = func;
   params.period = period;
-  // i=pop_task();
-  //insert_task(i);
+  reposition_first_task();
 }
 
 
@@ -212,39 +243,45 @@ void executePwmTask(TaskIndex ti){
   }
 }
 
-TaskIndex pop_task(){
+/* pop the first task and insert it according
+ *  to the time and priority
+ */
+
+void reposition_first_task(){
+  ENTER(); 
+  // Pop the first element.
+  
   TaskIndex ti = next_task; // task index
   TaskIndex bi = tasks[ti].prev;
   next_task = tasks[ti].next;
   tasks[bi].next = next_task;
   tasks[next_task].prev = bi;
   // TR(next_task);
-  return ti;
-}
 
-/* insert the task according to the time and priority
- *  ti -- task index
- */
-inline void insert_task(TaskIndex ti){
-    TaskIndex pi = next_task; // place index
-    while(true){
-      if (tasks[pi].mode == NoTask) break;
-      if ( tasks[pi].wtime < tasks[ti].wtime) break;
-      if (  tasks[pi].wtime == tasks[ti].wtime
-         && tasks[pi].priority < tasks[ti].wtime) break;
-      pi = tasks[pi].next;
-      // TR(pi);
-    }
-    // MSG("Foun a place to insert a task.");
-    // TR(pi);
-    TaskIndex bi = tasks[pi].prev; // the before-task.
-    if (pi == next_task){
-      next_task = ti; 
-    }
-    tasks[ti].next=pi;
-    tasks[pi].prev=ti;
-    tasks[bi].next=ti;
-    tasks[ti].prev=bi;
+  MSG("Insert the element back according to time and priority.");
+  
+  TaskIndex pi = next_task; // place index
+  while(true){
+    if (tasks[pi].mode == NoTask) break;
+    if ( tasks[pi].wtime > tasks[ti].wtime) break;
+    if (  tasks[pi].wtime == tasks[ti].wtime
+       && tasks[pi].priority > tasks[ti].wtime) break;
+    pi = tasks[pi].next;
+    if (pi == next_task) break;
+    TR(pi);
+  }
+  MSG("Found a place to insert a task.");
+  TR(pi);
+  if (pi == next_task){
+    next_task = ti; 
+  }
+  bi = tasks[pi].prev; // the before-task.
+  tasks[ti].next=pi;
+  tasks[pi].prev=ti;
+  tasks[bi].next=ti;
+  tasks[ti].prev=bi;
+  REPORT_TASKS();
+  LEAVE(); 
 }
 
 void run_task(){
@@ -269,6 +306,5 @@ void run_task(){
         // error.
         return;
     }
-    TaskIndex ti=pop_task();
-    insert_task(ti);
+    reposition_first_task();
 }

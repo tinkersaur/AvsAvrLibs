@@ -25,7 +25,7 @@ void setup(){
   init_tasks();
   add_callback_task(1, 250000, greetingsA);
   add_callback_task(2, 330000, greetingsB);
-  add_callback_task(3,  50000, greetingsC);
+  add_callback_task(3, 500000, greetingsC);
 }
 
 void loop() {
