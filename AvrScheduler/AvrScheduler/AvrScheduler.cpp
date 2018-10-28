@@ -2,22 +2,6 @@
 
 /** Updated on 2018-10-28 */
 
-/**
- *  Links:
- *  
- Note that PWM for controlling servo is different from controlling a motor.
- PWM for motor has 500Hz and duty cycle 0 to 100%.
- Servo is controlled at 50Hz. and has a duty cycle between 1ms to 2ms.
-
- https://www.arduino.cc/en/Tutorial/SecretsOfArduinoPWM
- https://learn.sparkfun.com/tutorials/hobby-servo-tutorial
- https://www.arduino.cc/en/Tutorial/SecretsOfArduinoPWM
- http://playground.arduino.cc/Main/PWMallPins
- https://www.norwegiancreations.com/2017/09/arduino-tutorial-using-millis-instead-of-delay/
- https://www.norwegiancreations.com/2018/10/arduino-tutorial-avoiding-the-overflow-issue-when-using-millis-and-micros/
-
-
- */
 /*  Clock 16MHz,
  *  For PWM motor:
  *  500Hz, with 255 levels of power yields 78.431 milliseconds. 
@@ -27,21 +11,8 @@
  *  Note, everywhere here, "tick" means a 1/64 of milliseconds.
  *  Millisecond would be a convinient choice, but floating point operations
  *  are slow, this precision suffice, and dividing on 64 is easy.
- *  
- *  
  */
  
-/*
- * TODO:
-   - handle the situation when clock overflows.
-   - Test if inline keyword works.
-   - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
-   - Add an initial delay for the callbacks.
-   - Next invocation time should be based on the designed invocation,
-     not on occured invocation. This would improve the precision.
-   - Why times are off by one?
-*/
-
 #include<Arduino.h>
 #include"AvrScheduler.h"
 #include<assert.h>
@@ -94,6 +65,7 @@ enum TaskType{
 struct Task{
   uint8_t mode;
   Period wtime; // wakeup time.
+  bool clock_overrun;
   uint8_t priority;
   TaskParameters params;
   TaskIndex next;
@@ -185,11 +157,10 @@ TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func){
   reposition_first_task();
 }
 
-
-
 void scheduleMotorTask(TaskIndex ti){
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
+  Period ltime = task.wtime; // last time.
   switch(params.phase){
     case 0:
       params.on_duration = (params.duty * TicksPerMotorDutyLevel) >> 6;
@@ -202,11 +173,13 @@ void scheduleMotorTask(TaskIndex ti){
       error();
       break;
   }
+  task.clock_overrun = (task.wtime < ltime); 
 }
 
 void scheduleServoTask(TaskIndex ti){
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
+  Period ltime = task.wtime; // last time.
   switch(params.phase){
     case 0:
       params.on_duration = (TicksInZeroServoDuty + params.duty * TicksPerServoDutyLevel)>>6;
@@ -219,12 +192,15 @@ void scheduleServoTask(TaskIndex ti){
       error();
       break;
   }
+  task.clock_overrun = (task.wtime < ltime); 
 }
 
 void scheduleCallbackTask(TaskIndex ti){
   Task & task = tasks[ti];
+  Period ltime = task.wtime; // last time.
   CallbackParameters & params = tasks[next_task].params.callback;
   task.wtime = task.wtime + params.period;
+  task.clock_overrun = (task.wtime < ltime); 
 }
 
 /* This works for both Motors and for Servos.
@@ -263,6 +239,7 @@ void reposition_first_task(){
   TaskIndex pi = next_task; // place index
   while(true){
     if (tasks[pi].mode == NoTask) break;
+    if (tasks[ti].clock_overrun > tasks[pi].clock_overrun) break;
     if ( tasks[pi].wtime > tasks[ti].wtime) break;
     if (  tasks[pi].wtime == tasks[ti].wtime
        && tasks[pi].priority > tasks[ti].wtime) break;
