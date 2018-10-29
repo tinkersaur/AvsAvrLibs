@@ -1,3 +1,4 @@
 # Do not keep track of the copies of the libraries.
 *test*/*.h
 *test*/*.cpp
+.*.swp
