@@ -20,7 +20,16 @@ typedef byte Phase;
 typedef byte Duty;
   // ^^^ A parameter of the task, which is most likely to be
   //     The angle of the servo, or the power of the motor.
-  //     By convention, 0 is 0%, and 255 is 100%.
+  //     By convention, 0 is 0%, and 255 is 100%, for the motor,
+  //     and 0 corresponds to the smallest angle, and 255 to the
+  //     largest angle. Note that servos might have non-linearities
+  //     at the edge of the range, and where this happens might
+  //     vary from servo to servo. 
+  //     The values must be a little bit beyond the range
+  //     to allow for the variation between individaul servos.
+  // 
+  //     Values 2..250 work well with the servo I have. Please adjust your
+  //     angles depending on the servo you have.
 
 typedef byte Priority;
 

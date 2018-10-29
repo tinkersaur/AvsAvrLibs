@@ -33,6 +33,7 @@
 - see how servo library is implemented. Per documentation it is
   able to drive up to 12 servros. See how it is done.
 - dynamic allocation of tasks.
+- use the same approach as used in Servo library to generatre better PWM.
 
 *** Observations ****
 

@@ -19,7 +19,7 @@
 
 #define error() Serial.print("Scheduler error at "); Serial.println(__LINE__);
 
-//#define TRACE
+// #define TRACE
 #ifdef TRACE
     #define ENTER() Serial.print("Entering "); Serial.println(__func__); 
     #define LEAVE() Serial.print("Leaving "); Serial.println(__func__); 
@@ -82,25 +82,28 @@ TaskIndex next_task;
 
 typedef unsigned long Ticks; // 1/64 of millisecond
 
-static const Ticks MaxMotorDuty = 255;
-
-static const Ticks TicksPerMotorDutyLevel = 502;
-// ^^ Calculated as: 1e6*0.002/255*64
-
 /*** Servo ***/
 
+// These values must be a little bit beyond the range
+// to allow for the variation between individaul servos.
+
 static const Ticks MaxServoDuty = 255;
-static const Ticks TicksInZeroServoDuty = 625 * 64;
+static const Ticks TicksInZeroServoDuty = 550 * 64ul;
     // Per data sheet: 0.001 * 1e6 * 64 = 1000 * 64,
     // Emprirical: 625 * 64.
 
-static const Ticks TicksPerServoDutyLevel = 489;
+static const Ticks TicksPerServoDutyLevel = 2000ul * 64 / 255;
     // ^^ Calculated as: 1e6*0.001/255*64 = 251
-    // Empirical 1950 * 64 / 255 = 489
+    // Empirical 2000 * 64 / 255 = 489
 
 static const Ticks ServoPeriodMicroSec = 0.02 * 1e6; // This is 50Hz.
 
 /*** Motor ***/
+
+static const Ticks MaxMotorDuty = 255;
+
+static const Ticks TicksPerMotorDutyLevel = 502;
+// ^^ Calculated as: 1e6*0.002/255*64
 
 static const Ticks TicksInMaxMotorDuty = MaxMotorDuty * TicksPerMotorDutyLevel;
 static const Ticks TicksInMotorPeriod = MaxMotorDuty * TicksPerMotorDutyLevel;
@@ -165,6 +168,7 @@ TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func){
   params.func = func;
   params.period = period;
   reposition_first_task();
+  return i;
 }
 
 TaskIndex add_servo_task(Priority priority, PinIndex pin, Duty initial_duty){
@@ -179,6 +183,7 @@ TaskIndex add_servo_task(Priority priority, PinIndex pin, Duty initial_duty){
   params.duty = initial_duty;
   params.phase = 0;
   reposition_first_task();
+  return i;
 }
 
 void scheduleMotorTask(TaskIndex ti){
@@ -206,7 +211,11 @@ void scheduleServoTask(TaskIndex ti){
   Period ltime = task.wtime; // last time.
   switch(params.phase){
     case 0:
+      // TR(params.duty);
+      // TR(TicksInZeroServoDuty);
+      // TR(TicksPerServoDutyLevel);
       params.on_duration = (TicksInZeroServoDuty + params.duty * TicksPerServoDutyLevel)>>6;
+      // TR(params.on_duration);
       task.wtime = task.wtime + params.on_duration;
       break;
     case 1:
