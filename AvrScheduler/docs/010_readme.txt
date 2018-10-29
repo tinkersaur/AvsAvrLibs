@@ -22,13 +22,17 @@
  050_test_motors_and_servo
  060_test_overrun
  070_test_initial_delay
- 080_test_
+ 080_test_cancel_task
   
  *** TODO ***
 
 - Why times are off by one?
-- Add an initial delay for the callbacks.
+- Add an initial delay for all add_*_t ask().
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
+- Add a function that reports how much time we got before the next task.
+- see how servo library is implemented. Per documentation it is
+  able to drive up to 12 servros. See how it is done.
+- dynamic allocation of tasks.
 
 *** Observations ****
 
