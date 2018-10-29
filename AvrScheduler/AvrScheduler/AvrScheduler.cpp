@@ -87,14 +87,23 @@ static const Ticks MaxMotorDuty = 255;
 static const Ticks TicksPerMotorDutyLevel = 502;
 // ^^ Calculated as: 1e6*0.002/255*64
 
+/*** Servo ***/
+
 static const Ticks MaxServoDuty = 255;
-static const Ticks TicksPerServoDutyLevel = 251;
-// ^^ Calculated as: 1e6*0.001/255*64
+static const Ticks TicksInZeroServoDuty = 625 * 64;
+    // Per data sheet: 0.001 * 1e6 * 64 = 1000 * 64,
+    // Emprirical: 625 * 64.
+
+static const Ticks TicksPerServoDutyLevel = 489;
+    // ^^ Calculated as: 1e6*0.001/255*64 = 251
+    // Empirical 1950 * 64 / 255 = 489
+
+static const Ticks ServoPeriodMicroSec = 0.02 * 1e6; // This is 50Hz.
+
+/*** Motor ***/
 
 static const Ticks TicksInMaxMotorDuty = MaxMotorDuty * TicksPerMotorDutyLevel;
 static const Ticks TicksInMotorPeriod = MaxMotorDuty * TicksPerMotorDutyLevel;
-static const Ticks TicksInServoPeriod = MaxMotorDuty * TicksPerMotorDutyLevel;
-static const Ticks TicksInZeroServoDuty = 0.01 * 16e6;
 
 //assert(TicksInMaxMotorDuty<TicksInMotorPeriod);
 
@@ -148,12 +157,27 @@ TaskIndex add_task(){
 
 TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func){
   TaskIndex i = add_task();
+  if (i >= MaxNumTasks) return i;
   tasks[i].priority = priority;
   tasks[i].mode = CallbackTask;
   tasks[i].wtime = 0;
   CallbackParameters & params = tasks[i].params.callback;
   params.func = func;
   params.period = period;
+  reposition_first_task();
+}
+
+TaskIndex add_servo_task(Priority priority, PinIndex pin, Duty initial_duty){
+  TaskIndex i = add_task();
+  if (i >= MaxNumTasks) return i;
+  tasks[i].priority = priority;
+  tasks[i].mode = ServoTask;
+  tasks[i].wtime = 0;
+  PwmParameters & params = tasks[i].params.pwm;
+  params.pin = pin;
+  pinMode(pin, OUTPUT);
+  params.duty = initial_duty;
+  params.phase = 0;
   reposition_first_task();
 }
 
@@ -186,7 +210,7 @@ void scheduleServoTask(TaskIndex ti){
       task.wtime = task.wtime + params.on_duration;
       break;
     case 1:
-      task.wtime = task.wtime + TicksInServoPeriod - params.on_duration;
+      task.wtime = task.wtime + ServoPeriodMicroSec - params.on_duration;
       break;
     default:
       error();
@@ -201,6 +225,11 @@ void scheduleCallbackTask(TaskIndex ti){
   CallbackParameters & params = tasks[next_task].params.callback;
   task.wtime = task.wtime + params.period;
   task.clock_overrun = (task.wtime < ltime); 
+}
+
+TaskIndex set_task_duty(TaskIndex id, Duty duty){
+  PwmParameters & params = tasks[id].params.pwm;
+  params.duty = duty;
 }
 
 /* This works for both Motors and for Servos.
@@ -262,7 +291,8 @@ void reposition_first_task(){
 }
 
 void run_task(){
-    //TR(tasks[next_task].wtime);
+    ENTER();
+    TR(tasks[next_task].wtime);
     while(micros()<tasks[next_task].wtime);
     switch(tasks[next_task].mode){
       case ServoTask:
@@ -284,4 +314,5 @@ void run_task(){
         return;
     }
     reposition_first_task();
+    LEAVE();
 }
