@@ -14,10 +14,10 @@
  
  010_test_one_thread
  020_test_three_threads
+ 030_test_servo 
  
  These tests are not working yet:
 
- 030_test_servo 
  040_test_motor
  050_test_motors_and_servo
  060_test_overrun
@@ -34,6 +34,27 @@
   able to drive up to 12 servros. See how it is done.
 - dynamic allocation of tasks.
 - use the same approach as used in Servo library to generatre better PWM.
+- other types of tasks:
+    swipe servo
+        : pin
+        : min angle
+        : max angle
+        : swing duration
+        : pause
+        : offset.
+    servo motions:
+        : pin
+        : num_motion_modes ... mode
+        : num_motion_phases[mode]... phase
+        : position[mode][phase]
+        : time[mode][phase]
+        : offset
+    read_analog:
+        : pin
+        : id
+        : get_task_value(task_id).
+
+    
 
 *** Observations ****
 

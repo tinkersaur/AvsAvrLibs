@@ -1,6 +1,6 @@
 /**  The library for generating PWM and on several pins */
 
-/** Updated on 2018-10-28 */
+/** Updated on 2018-10-31 */
 
 /*  Clock 16MHz,
  *  For PWM motor:
@@ -102,14 +102,11 @@ static const Ticks ServoPeriodMicroSec = 0.02 * 1e6; // This is 50Hz.
 
 static const Ticks MaxMotorDuty = 255;
 
-static const Ticks TicksPerMotorDutyLevel = 502;
+static const Ticks TicksPerMotorDutyLevel = 502ul;
 // ^^ Calculated as: 1e6*0.002/255*64
 
-static const Ticks TicksInMaxMotorDuty = MaxMotorDuty * TicksPerMotorDutyLevel;
-static const Ticks TicksInMotorPeriod = MaxMotorDuty * TicksPerMotorDutyLevel;
-
-//assert(TicksInMaxMotorDuty<TicksInMotorPeriod);
-
+static const Period MotorPeriodMicroSec = 2000ul;
+// 1e6*0.002
 
 void reposition_first_task();
 
@@ -186,6 +183,21 @@ TaskIndex add_servo_task(Priority priority, PinIndex pin, Duty initial_duty){
   return i;
 }
 
+TaskIndex add_motor_task(Priority priority, PinIndex pin, Duty initial_duty){
+  TaskIndex i = add_task();
+  if (i >= MaxNumTasks) return i;
+  tasks[i].priority = priority;
+  tasks[i].mode = MotorTask;
+  tasks[i].wtime = 0;
+  PwmParameters & params = tasks[i].params.pwm;
+  params.pin = pin;
+  pinMode(pin, OUTPUT);
+  params.duty = initial_duty;
+  params.phase = 0;
+  reposition_first_task();
+  return i;
+}
+
 void scheduleMotorTask(TaskIndex ti){
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
@@ -193,10 +205,10 @@ void scheduleMotorTask(TaskIndex ti){
   switch(params.phase){
     case 0:
       params.on_duration = (params.duty * TicksPerMotorDutyLevel) >> 6;
-      task.wtime = task.wtime + params.on_duration;
+      task.wtime += params.on_duration;
       break;
     case 1:
-      task.wtime = task.wtime + TicksInMotorPeriod - params.on_duration;
+      task.wtime += MotorPeriodMicroSec - params.on_duration;
       break;
     default:
       error();
@@ -216,10 +228,10 @@ void scheduleServoTask(TaskIndex ti){
       // TR(TicksPerServoDutyLevel);
       params.on_duration = (TicksInZeroServoDuty + params.duty * TicksPerServoDutyLevel)>>6;
       // TR(params.on_duration);
-      task.wtime = task.wtime + params.on_duration;
+      task.wtime += params.on_duration;
       break;
     case 1:
-      task.wtime = task.wtime + ServoPeriodMicroSec - params.on_duration;
+      task.wtime +=  ServoPeriodMicroSec - params.on_duration;
       break;
     default:
       error();
@@ -232,7 +244,7 @@ void scheduleCallbackTask(TaskIndex ti){
   Task & task = tasks[ti];
   Period ltime = task.wtime; // last time.
   CallbackParameters & params = tasks[next_task].params.callback;
-  task.wtime = task.wtime + params.period;
+  task.wtime += params.period;
   task.clock_overrun = (task.wtime < ltime); 
 }
 
