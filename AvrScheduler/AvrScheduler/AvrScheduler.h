@@ -49,6 +49,11 @@ TaskIndex add_delayed_task(Priority priority, Period task_delay, TaskFunc func);
 
 TaskIndex set_task_duty(TaskIndex id, Duty duty);
 
+/**
+* Set task's next wakeup time. By default, it is zero.
+*/
+TaskIndex set_task_wtime(TaskIndex id, Period t);
+
 TaskIndex cancel_task(Period period, TaskFunc func);
 
 void run_task();

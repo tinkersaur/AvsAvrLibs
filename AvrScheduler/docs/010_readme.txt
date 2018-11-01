@@ -26,8 +26,8 @@
   
  *** TODO ***
 
-- Why times are off by one?
 - Add an initial delay for all add_*_t ask().
+- Why times are off by one?
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
 - Add a function that reports how much time we got before the next task.
 - see how servo library is implemented. Per documentation it is

@@ -108,7 +108,7 @@ static const Ticks TicksPerMotorDutyLevel = 502ul;
 static const Period MotorPeriodMicroSec = 2000ul;
 // 1e6*0.002
 
-void reposition_first_task();
+void schedule_task(TaskIndex);
 
 void report_tasks(){
     Serial.println("  *** Tasks ***");
@@ -164,7 +164,7 @@ TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func){
   CallbackParameters & params = tasks[i].params.callback;
   params.func = func;
   params.period = period;
-  reposition_first_task();
+  schedule_task(next_task);
   return i;
 }
 
@@ -179,7 +179,7 @@ TaskIndex add_servo_task(Priority priority, PinIndex pin, Duty initial_duty){
   pinMode(pin, OUTPUT);
   params.duty = initial_duty;
   params.phase = 0;
-  reposition_first_task();
+  schedule_task(next_task);
   return i;
 }
 
@@ -194,11 +194,11 @@ TaskIndex add_motor_task(Priority priority, PinIndex pin, Duty initial_duty){
   pinMode(pin, OUTPUT);
   params.duty = initial_duty;
   params.phase = 0;
-  reposition_first_task();
+  schedule_task(next_task);
   return i;
 }
 
-void scheduleMotorTask(TaskIndex ti){
+void calcMotorTaskWtime(TaskIndex ti){
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
   Period ltime = task.wtime; // last time.
@@ -217,7 +217,7 @@ void scheduleMotorTask(TaskIndex ti){
   task.clock_overrun = (task.wtime < ltime); 
 }
 
-void scheduleServoTask(TaskIndex ti){
+void calcServoTaskWtime(TaskIndex ti){
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
   Period ltime = task.wtime; // last time.
@@ -227,7 +227,7 @@ void scheduleServoTask(TaskIndex ti){
       // TR(TicksInZeroServoDuty);
       // TR(TicksPerServoDutyLevel);
       params.on_duration = (TicksInZeroServoDuty + params.duty * TicksPerServoDutyLevel)>>6;
-      // TR(params.on_duration);
+      // TR(params.en_duration);
       task.wtime += params.on_duration;
       break;
     case 1:
@@ -253,6 +253,11 @@ TaskIndex set_task_duty(TaskIndex id, Duty duty){
   params.duty = duty;
 }
 
+TaskIndex set_task_wtime(TaskIndex id, Period t){
+  tasks[id].wtime = t; 
+  schedule_task(id);
+}
+
 /* This works for both Motors and for Servos.
 */
 void executePwmTask(TaskIndex ti){
@@ -273,38 +278,40 @@ void executePwmTask(TaskIndex ti){
  *  to the time and priority
  */
 
-void reposition_first_task(){
+void schedule_task(TaskIndex ti){
   ENTER(); 
   // Pop the first element.
-  
-  TaskIndex ti = next_task; // task index
+ 
+  if (ti == next_task){
+    next_task = tasks[ti].next;
+  }
+
   TaskIndex bi = tasks[ti].prev;
-  next_task = tasks[ti].next;
-  tasks[bi].next = next_task;
-  tasks[next_task].prev = bi;
+  TaskIndex ni = tasks[ti].next;
+  tasks[bi].next = ni;
+  tasks[ni].prev = bi;
   // TR(next_task);
 
   MSG("Insert the element back according to time and priority.");
   
-  TaskIndex pi = next_task; // place index
   while(true){
-    if (tasks[pi].mode == NoTask) break;
-    if (tasks[ti].clock_overrun > tasks[pi].clock_overrun) break;
-    if ( tasks[pi].wtime > tasks[ti].wtime) break;
-    if (  tasks[pi].wtime == tasks[ti].wtime
-       && tasks[pi].priority > tasks[ti].wtime) break;
-    pi = tasks[pi].next;
-    if (pi == next_task) break;
-    TR(pi);
+    if (tasks[ni].mode == NoTask) break;
+    if (tasks[ti].clock_overrun > tasks[ni].clock_overrun) break;
+    if ( tasks[ni].wtime > tasks[ti].wtime) break;
+    if (  tasks[ni].wtime == tasks[ti].wtime
+       && tasks[ni].priority < tasks[ti].wtime) break;
+    ni = tasks[ni].next;
+    if (ni == next_task) break;
+    TR(ni);
   }
   MSG("Found a place to insert a task.");
-  TR(pi);
-  if (pi == next_task){
+  TR(ni);
+  if (ni == next_task){
     next_task = ti; 
   }
-  bi = tasks[pi].prev; // the before-task.
-  tasks[ti].next=pi;
-  tasks[pi].prev=ti;
+  bi = tasks[ni].prev; // the before-task.
+  tasks[ti].next=ni;
+  tasks[ni].prev=ti;
   tasks[bi].next=ti;
   tasks[ti].prev=bi;
   REPORT_TASKS();
@@ -317,11 +324,11 @@ void run_task(){
     while(micros()<tasks[next_task].wtime);
     switch(tasks[next_task].mode){
       case ServoTask:
-        scheduleServoTask(next_task);
+        calcServoTaskWtime(next_task);
         executePwmTask(next_task);
         break;
       case MotorTask:
-        scheduleMotorTask(next_task);
+        calcMotorTaskWtime(next_task);
         executePwmTask(next_task);
         break;
       case CallbackTask:
@@ -334,6 +341,6 @@ void run_task(){
         // error.
         return;
     }
-    reposition_first_task();
+    schedule_task(next_task);
     LEAVE();
 }
