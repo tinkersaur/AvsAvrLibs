@@ -4,7 +4,6 @@
 
 short angle, dir;
 
-
 byte servo_task;
 
 // These values work well with the servo I have.
@@ -36,10 +35,10 @@ void setup(){
   // Initialize this first so that tracing can be done.
   //Serial.begin(9600);
   Serial.begin(115200);
-  dir = angle_step;
-  angle = 128;
   init_tasks();
 
+  dir = angle_step;
+  angle = 128;
   servo_task = add_servo_task(1, ServoPin, angle);
   add_callback_task(2, 10000, update_angle);
 }

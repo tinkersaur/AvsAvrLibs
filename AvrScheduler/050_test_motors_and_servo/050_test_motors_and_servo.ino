@@ -1,21 +1,45 @@
 #include"AvrScheduler.h"
 
-#define    LeftWheelPwm    5
-#define    LeftWheelPin2   6
-#define    LeftWheelPin1   7
+#define ServoPin 4
 
-#define    RightWheelPin2   8
-#define    RightWheelPin1   9
-#define    RightWheelPwm   10
+#define LeftWheelPwm    5
+#define LeftWheelPin2   6
+#define LeftWheelPin1   7
+
+#define RightWheelPin2   8
+#define RightWheelPin1   9
+#define RightWheelPwm   10
 
 short left_power, right_power, left_dir, right_dir;
 
-
 byte left_motor_task, right_motor_task;
+
+short angle, dir;
+
+byte servo_task;
 
 static const short min_power=0;
 static const short max_power=128;
 short power_step= 1;
+
+static const short min_angle=2;
+static const short max_angle=250;
+short angle_step= 1;
+
+void update_angle(){
+    if (angle >= max_angle){
+        angle = max_angle;
+        dir = -angle_step;
+    }
+    if (angle <= min_angle){
+        angle = min_angle;
+        dir = angle_step;
+    }
+    angle += dir;
+    set_task_duty(servo_task, angle);
+    // Serial.print("angle: ");
+    // Serial.println(angle);
+}
 
 void update_left_power(){
     if (left_power>= max_power){
@@ -51,7 +75,9 @@ void setup(){
   //Serial.begin(9600);
   Serial.begin(115200);
   init_tasks();
-  
+
+   /** left motor setup **/
+
   left_dir = power_step;
   left_power = 200;
   pinMode(LeftWheelPin1, OUTPUT);
@@ -61,6 +87,8 @@ void setup(){
   left_motor_task = add_motor_task(1, LeftWheelPwm, left_power);
   add_callback_task(21, 10000, update_left_power);
 
+   /** right motor setup **/
+
   right_dir = power_step;
   right_power = 72;
   pinMode(RightWheelPin1, OUTPUT);
@@ -69,6 +97,13 @@ void setup(){
   digitalWrite(RightWheelPin2, 0);
   right_motor_task = add_motor_task(2, RightWheelPwm, right_power);
   add_callback_task(22, 10000, update_right_power);
+
+   /** servo setup **/
+
+  dir = angle_step;
+  angle = 128;
+  servo_task = add_servo_task(1, ServoPin, angle);
+  add_callback_task(2, 10000, update_angle);
 }
 
 void loop() {

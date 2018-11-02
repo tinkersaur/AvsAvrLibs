@@ -54,7 +54,7 @@ TaskIndex set_task_duty(TaskIndex id, Duty duty);
 */
 TaskIndex set_task_wtime(TaskIndex id, Period t);
 
-TaskIndex cancel_task(Period period, TaskFunc func);
+TaskIndex cancel_task(TaskIndex ti);
 
 void run_task();
 

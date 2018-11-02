@@ -3,30 +3,35 @@
  This library enables generating PWM and on several pins to control
  many motors and servos, and run other tasks with a delay or periodically.
 
- Author
+ *** Author ***
 
 (C) 2018 Andrey Sobol. All rights reserved.
 
 
- Status
+ *** Status ***
+
+ Some functionality has been implemented and tested, and some is still in
+ progress. Most importanly, I am able to drive 2 motors and a servo, although
+ there seem to be some interference between them -- I see that the range of the
+ servo swing is not the same as it was without the motors. Should try to use
+ different timers.
 
  These tests are working:
  
  010_test_one_thread
  020_test_three_threads
  030_test_servo 
+ 040_test_motor
+ 050_test_motors_and_servo
  
  These tests are not working yet:
 
- 040_test_motor
- 050_test_motors_and_servo
  060_test_overrun
  070_test_initial_delay
- 080_test_cancel_task
+ 080_test_cancel_task // Not implemented.
   
  *** TODO ***
 
-- Add an initial delay for all add_*_t ask().
 - Why times are off by one?
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
 - Add a function that reports how much time we got before the next task.
@@ -34,7 +39,7 @@
   able to drive up to 12 servros. See how it is done.
 - dynamic allocation of tasks.
 - use the same approach as used in Servo library to generatre better PWM.
-- other types of tasks:
+- other types of tasks that can be implemented:
     swipe servo
         : pin
         : min angle
@@ -59,6 +64,10 @@
 *** Observations ****
 
 - inline keyword is ignored.
+- The library is intended to work together with serial communication. It
+  has been observed that serial communication can interfere with
+  perfomance of servos. It is might be possible to improve
+  that in the future.
 
 *** Links ***
   

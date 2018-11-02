@@ -296,10 +296,12 @@ void schedule_task(TaskIndex ti){
   
   while(true){
     if (tasks[ni].mode == NoTask) break;
-    if (tasks[ti].clock_overrun > tasks[ni].clock_overrun) break;
-    if ( tasks[ni].wtime > tasks[ti].wtime) break;
-    if (  tasks[ni].wtime == tasks[ti].wtime
-       && tasks[ni].priority < tasks[ti].wtime) break;
+    if (tasks[ti].mode != NoTask) {
+        if (tasks[ti].clock_overrun > tasks[ni].clock_overrun) break;
+        if ( tasks[ni].wtime > tasks[ti].wtime) break;
+        if (  tasks[ni].wtime == tasks[ti].wtime
+           && tasks[ni].priority < tasks[ti].wtime) break;
+    }
     ni = tasks[ni].next;
     if (ni == next_task) break;
     TR(ni);
@@ -316,6 +318,11 @@ void schedule_task(TaskIndex ti){
   tasks[ti].prev=bi;
   REPORT_TASKS();
   LEAVE(); 
+}
+
+TaskIndex cancel_task(TaskIndex ti){
+    tasks[ti].mode = NoTask;
+    schedule_task(ti);
 }
 
 void run_task(){
