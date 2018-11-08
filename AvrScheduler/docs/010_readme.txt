@@ -29,6 +29,11 @@
  060_test_overrun
  070_test_initial_delay
  080_test_cancel_task // Not implemented.
+
+ *** In progress ***
+
+ currently trying to make use of Timer1 and the interrupts to obtain higher
+ precision. This work is in AvrScheduler2.
   
  *** TODO ***
 
@@ -69,15 +74,24 @@
   perfomance of servos. It is might be possible to improve
   that in the future.
 
+*** Notes ****
+
+- Arduino documentation says that only two pins can be configured to toggle interrupt.
+  However ATMega328P datasheet says differently on page 70. Interrupts PCI0, PCI1, and
+  PCI2, can be configured to be triggered if either of the pins in groups of eight
+  are toggled. The PCMSK2, PCMSK1 and PCMSK0 Registers control which pins contribute
+  to the pin change interrupts. And can be used for waking up from sleep and idle
+  modes.
+
 *** Links ***
   
  Note that PWM for controlling servo is different from controlling a motor.
  PWM for motor has 500Hz and duty cycle 0 to 100%.
  Servo is controlled at 50Hz. and has a duty cycle between 1ms to 2ms.
 
+ https://github.com/arduino/Arduino/
  https://www.arduino.cc/en/Tutorial/SecretsOfArduinoPWM
  https://learn.sparkfun.com/tutorials/hobby-servo-tutorial
- https://www.arduino.cc/en/Tutorial/SecretsOfArduinoPWM
  http://playground.arduino.cc/Main/PWMallPins
  https://www.norwegiancreations.com/2017/09/arduino-tutorial-using-millis-instead-of-delay/
  https://www.norwegiancreations.com/2018/10/arduino-tutorial-avoiding-the-overflow-issue-when-using-millis-and-micros/
