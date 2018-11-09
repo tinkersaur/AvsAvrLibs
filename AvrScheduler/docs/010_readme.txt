@@ -83,6 +83,12 @@
   to the pin change interrupts. And can be used for waking up from sleep and idle
   modes.
 
+- The timer overflow interrupt needs to be defined as
+  ISR(TIMER1_OVF_vect).
+  Unfortunately, TIM1_OVF symbol is also defined, and it produces
+  unfortunate result of messing up Serial IO. Note that  TIM1_OVF
+  is used in MCU datasheet. See link .../avr_intr_vectors below.
+
 *** Links ***
   
  Note that PWM for controlling servo is different from controlling a motor.
@@ -95,3 +101,4 @@
  http://playground.arduino.cc/Main/PWMallPins
  https://www.norwegiancreations.com/2017/09/arduino-tutorial-using-millis-instead-of-delay/
  https://www.norwegiancreations.com/2018/10/arduino-tutorial-avoiding-the-overflow-issue-when-using-millis-and-micros/
+ http://ee-classes.usc.edu/ee459/library/documents/avr_intr_vectors/

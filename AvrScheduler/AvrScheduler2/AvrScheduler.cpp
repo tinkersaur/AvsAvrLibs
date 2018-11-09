@@ -70,7 +70,7 @@ Task tasks[MaxNumTasks];
 
 TaskIndex next_task;
 
-volatile bool timer1_high_count;
+volatile uint16_t timer1_high_count;
 
 // Note that the last task is the task t such that t.next == next_task.
 
@@ -180,22 +180,20 @@ static void setup_timers(){
 
 }
 
-ISR(TIM1_OVF){
+ISR(TIMER1_OVF_vect){
     // This is Timer1 overflow interrupt.
-    
 
     // Bit TOV1 in TIFR1 is set, when the timer counter
     // overflows, however, Per p 140, TOV1 is automatically
     // cleared when the Timer/Counter1 overflow Interrupt Vector
     // is executed.
-
     timer1_high_count++;
 }
 
 
 /* ISR() defines an interrupt vector*/
 /* Timer1 CompareA interrupt.*/
-ISR(TIM1_COMPA){
+ISR(TIMER1_COMPA_vect){
         
     // Bit OCF1A in TIFR1 is set, when the timer counter
     // equals to OCR1A, however, Per p 140, OCF1A is automatically
