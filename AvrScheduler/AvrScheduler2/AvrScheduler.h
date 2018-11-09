@@ -60,6 +60,7 @@ TaskIndex cancel_task(TaskIndex ti);
 Period next_task_time();
 
 void wake_tasks();
+
 extern volatile uint16_t timer1_high_count;
 
 #endif

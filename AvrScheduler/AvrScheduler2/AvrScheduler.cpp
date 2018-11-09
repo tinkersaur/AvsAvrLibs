@@ -12,19 +12,7 @@
 #define error() Serial.print("Scheduler error at "); Serial.println(__LINE__);
 
 //#define TRACE
-#ifdef TRACE
-    #define ENTER() Serial.print("Entering "); Serial.println(__func__); 
-    #define LEAVE() Serial.print("Leaving "); Serial.println(__func__); 
-    #define MSG(X) Serial.println(X);
-    #define TR(X) Serial.print(#X " = "); Serial.println(X);
-    #define REPORT_TASKS() report_tasks();
-#else
-    #define ENTER()
-    #define LEAVE()
-    #define MSG(X)
-    #define TR(X)
-    #define REPORT_TASKS()
-#endif
+#include"macros.h"
 
 struct PwmParameters{
     Phase phase;
@@ -58,8 +46,8 @@ enum TaskType{
 struct Task{
   uint8_t mode;
   Period wtime; // wakeup time.
-  bool clock_overrun;
   uint8_t priority;
+  bool clock_overrun; // TODO: delete this member.
   TaskParameters params;
   TaskIndex next;
   TaskIndex prev;
@@ -189,6 +177,9 @@ static void setup_timers(){
 
 }
 
+#define SETUP_ISR
+#ifdef SETUP_ISR
+
 ISR(TIMER1_OVF_vect){
     // This is Timer1 overflow interrupt.
 
@@ -239,7 +230,8 @@ ISR(TIMER1_COMPA_vect){
     // SREG = sreg; 
 
     // While it is time to run the top task:
-    while(tasks[next_task].wtime <= clock){
+    while(tasks[next_task].mode != NoTask
+        && tasks[next_task].wtime <= clock){
 
         // If overflow occureed, update times of all tasks:
         if (overflow){
@@ -280,7 +272,7 @@ ISR(TIMER1_COMPA_vect){
     }
     LEAVE();
 }
-
+#endif
 
 void init_tasks(){
   // ENTER();
@@ -451,22 +443,28 @@ void schedule_task(TaskIndex ti){
   // TR(next_task);
 
   MSG("Insert the element back according to time and priority.");
-  
+ 
+  bool last_task = false;
+  ni = next_task;
   while(true){
     if (tasks[ni].mode == NoTask) break;
+    // Sometimes we need to insert a NoTask. But in this
+    // case we do not care about the time and the priority.
     if (tasks[ti].mode != NoTask) {
-        if (tasks[ti].clock_overrun > tasks[ni].clock_overrun) break;
         if ( tasks[ni].wtime > tasks[ti].wtime) break;
         if (  tasks[ni].wtime == tasks[ti].wtime
-           && tasks[ni].priority < tasks[ti].wtime) break;
+           && tasks[ni].priority > tasks[ti].priority) break;
     }
     ni = tasks[ni].next;
-    if (ni == next_task) break;
+    if (ni == next_task) {
+        last_task = true;
+        break;
+    }
     TR(ni);
   }
   MSG("Found a place to insert a task.");
   TR(ni);
-  if (ni == next_task){
+  if (ni == next_task && !last_task){
     next_task = ti; 
   }
   bi = tasks[ni].prev; // the before-task.
