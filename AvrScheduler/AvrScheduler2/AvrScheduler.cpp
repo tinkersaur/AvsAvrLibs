@@ -1,12 +1,13 @@
 
 /**  The library for generating PWM and on several pins */
 
-/** Updated on 2018-10-31 */
+/** Updated on 2018-11-08  */
 
 #include<Arduino.h>
 #include"AvrScheduler.h"
 #include<assert.h>
 #include<avr/interrupt.h>
+#include<avr/io.h> 
 
 #define error() Serial.print("Scheduler error at "); Serial.println(__LINE__);
 
@@ -69,6 +70,8 @@ Task tasks[MaxNumTasks];
 
 TaskIndex next_task;
 
+volatile bool timer1_high_count;
+
 // Note that the last task is the task t such that t.next == next_task.
 
 typedef unsigned long Ticks; // A tick is a counter of Timer1,
@@ -115,7 +118,11 @@ static const Ticks TicksPerMotorDutyLevel = 2ul;
 static const Period MotorPeriod = 510ul;
 // 1e6*0.002
 
-void schedule_task(TaskIndex);
+static void schedule_task(TaskIndex);
+static void run_next_task();
+static void calcMotorTaskWtime(TaskIndex ti);
+static void calcServoTaskWtime(TaskIndex ti);
+static void calcCallbackTaskWtime(TaskIndex ti);
 
 void report_tasks(){
     Serial.println("  *** Tasks ***");
@@ -135,8 +142,133 @@ void report_tasks(){
     }
 }
 
+/*
+Questions:
+    - If I assign this to timer compare interrupt, this interrupt
+      will be disabled until the function returns?
+
+    Links:
+    http://www.avr-tutorials.com/interrupts/avr-external-interrupt-c-programming
+*/
+
+// TSR(TIMER1COMPA) ???
+
+static void setup_timers(){
+    // Configure Timer1:
+
+    // TIMSK1 = [ – | – | ICIE1 | – | – | OCIE1B | OCIE1A | TOIE1 ] -- p 139.
+    // ICIE1 = 0 -- Timer/Counter1, Input Capture Interrupt Enable -- p 139
+    // OCIE1A = 1 -- Timer/Counter1, Output Compare A Match Interrupt Enable -- p139
+    // OCIE1B = 0 -- Timer/Counter1, Output Compare B Match Interrupt Enable -- p139
+    // TOIE1 = 1 Timer/Counter1, Overflow Interrupt Enable -- p139
+
+    TIMSK1 = 3;  
+    
+    // Next we configure clock source for timer 1, and
+    // prescaler for timer1 to be 1/64.
+
+    // COM1A1 = COM1B1 = COM1A0 = COM1B0 = 0 -- OC1A/B disconnected. P 134.
+    // WGM1[3:0] = 0 -- Normal Mode. p125, p136
+    // ICNC1=0 - Select noise caneling. Not important. P 121
+    // ICES1=0 - select trigger edge. Not important. P 136.
+    // CS1[2:0] = 0b011  -- set clock prescaler to 1/64, p 137
+    // TCCR1A = [COM1A1 | COM1A0 | COM1B1 | COM1B0 | –     | –    | WGM11 | WGM10] -- p134
+    // TCCR1B = [ ICNC1 | ICES1  | –      |  WGM13 | WGM12 | CS12 | CS11  | CS10 ] -- p136
+
+    TCCR1A = 0;
+    TCCR1B = 3;
+
+}
+
+ISR(TIM1_OVF){
+    // This is Timer1 overflow interrupt.
+    
+
+    // Bit TOV1 in TIFR1 is set, when the timer counter
+    // overflows, however, Per p 140, TOV1 is automatically
+    // cleared when the Timer/Counter1 overflow Interrupt Vector
+    // is executed.
+
+    timer1_high_count++;
+}
+
+
+/* ISR() defines an interrupt vector*/
+/* Timer1 CompareA interrupt.*/
+ISR(TIM1_COMPA){
+        
+    // Bit OCF1A in TIFR1 is set, when the timer counter
+    // equals to OCR1A, however, Per p 140, OCF1A is automatically
+    // cleared when the Timer/Counter1 overflow Interrupt Vector
+    // is executed.
+
+    unsigned char sreg;
+    bool etime; // Execute time. 
+    // etime is true if it is time to execute the new task.
+    bool overflow;
+    unsigned long clock;
+
+    // We want to obtain the true clock value. To do that, we temporaraly
+    // disable all interrupts, so that overflow interrupt does not occur.
+    sreg = SREG;
+    cli();
+
+    // Check if overflow occured.
+    if (timer1_high_count >= 0x8FFF){
+        overflow = true;
+        timer1_high_count -= 0x8FFF;
+    }
+
+    // Obtain the true clock value. 
+    clock = (timer1_high_count<<16) | TCNT1;
+
+    // Restore interrupts:
+    SREG = sreg; 
+
+    // While it is time to run the top task:
+    while(tasks[next_task].wtime >= clock){
+
+        // If overflow occureed, update times of all tasks:
+        if (overflow){
+            TaskIndex ti=next_task;
+            do{
+                tasks[ti].wtime -= 0x8FFF<<16; 
+                ti = tasks[ti].next;
+            }while(ti!=next_task);
+        }
+
+        run_next_task();
+
+        // In the rest of the loop body, we evaluate
+        // if it is time to run the next task again.
+
+        SREG = sreg;
+        cli();
+
+        // Clear interrupt flag. Page 114:
+        TIFR1 &= ~(1<<TIMSK1);
+
+        // Set wakeup time:
+        OCR1A = tasks[next_task].wtime & 0xFFFF; 
+
+        // Check if overflow occured.
+        if (timer1_high_count >= 0x8FFF){
+            overflow = true;
+            timer1_high_count -= 0x8FFF;
+        }
+
+        // Obtain the true clock value. 
+        clock = (timer1_high_count<<16) | TCNT1;
+
+        // restore interrupts.
+        SREG = sreg;
+    }
+}
+
+
 void init_tasks(){
   // ENTER();
+  setup_timers();
   next_task = 0;
   for(TaskIndex i = 0; i < MaxNumTasks; i++){
     tasks[i].next = (i+1) % MaxNumTasks;
@@ -247,11 +379,11 @@ void calcServoTaskWtime(TaskIndex ti){
   task.clock_overrun = (task.wtime < ltime); 
 }
 
-void scheduleCallbackTask(TaskIndex ti){
+void calcCallbackTaskWtime(TaskIndex ti){
   Task & task = tasks[ti];
   Period ltime = task.wtime; // last time.
   CallbackParameters & params = tasks[next_task].params.callback;
-  task.wtime += params.period;
+  task.wtime += (params.period>>2);
   task.clock_overrun = (task.wtime < ltime); 
 }
 
@@ -331,133 +463,6 @@ TaskIndex cancel_task(TaskIndex ti){
     tasks[ti].mode = NoTask;
     schedule_task(ti);
 }
-
-/*
-Questions:
-    - If I assign this to timer compare interrupt, this interrupt
-      will be disabled until the function returns?
-
-    Links:
-    http://www.avr-tutorials.com/interrupts/avr-external-interrupt-c-programming
-*/
-
-// TSR(TIMER1COMPA) ???
-
-void setup_timers(){
-    // Configure Timer1:
-
-    // TIMSK1 = [ – | – | ICIE1 | – | – | OCIE1B | OCIE1A | TOIE1 ] -- p 139.
-    // ICIE1 = 0 -- Timer/Counter1, Input Capture Interrupt Enable -- p 139
-    // OCIE1A = 1 -- Timer/Counter1, Output Compare A Match Interrupt Enable -- p139
-    // OCIE1B = 0 -- Timer/Counter1, Output Compare B Match Interrupt Enable -- p139
-    // TOIE1 = 1 Timer/Counter1, Overflow Interrupt Enable -- p139
-
-    TIMSK1 = 3;  
-    
-    // Next we configure clock source for timer 1, and
-    // prescaler for timer1 to be 1/64.
-
-    // COM1A1 = COM1B1 = COM1A0 = COM1B0 = 0 -- OC1A/B disconnected. P 134.
-    // WGM1[3:0] = 0 -- Normal Mode. p125, p136
-    // ICNC1=0 - Select noise caneling. Not important. P 121
-    // ICES1=0 - select trigger edge. Not important. P 136.
-    // CS1[2:0] = 0b011  -- set clock prescaler to 1/64, p 137
-    // TCCR1A = [COM1A1 | COM1A0 | COM1B1 | COM1B0 | –     | –    | WGM11 | WGM10] -- p134
-    // TCCR1B = [ ICNC1 | ICES1  | –      |  WGM13 | WGM12 | CS12 | CS11  | CS10 ] -- p136
-
-    TCCR1A = 0;
-    TCCR1B = 3;
-
-}
-
-volatile bool timer1_high_count;
-
-ISR(TIM1_OVF){
-    // This is Timer1 overflow interrupt.
-    
-
-    // Bit TOV1 in TIFR1 is set, when the timer counter
-    // overflows, however, Per p 140, TOV1 is automatically
-    // cleared when the Timer/Counter1 overflow Interrupt Vector
-    // is executed.
-
-    timer1_high_count++;
-}
-
-
-/* ISR() defines an interrupt vector*/
-/* Timer1 CompareA interrupt.*/
-ISR(TIM1_COMPA){
-        
-    // Bit OCF1A in TIFR1 is set, when the timer counter
-    // equals to OCR1A, however, Per p 140, OCF1A is automatically
-    // cleared when the Timer/Counter1 overflow Interrupt Vector
-    // is executed.
-
-    unsigned char reg;
-    bool etime; // Execute time. 
-    // etime is true if it is time to execute the new task.
-    bool overflow;
-    unsigned long clock;
-
-    // We want to obtain the true clock value. To do that, we temporaraly
-    // disable all interrupts, so that overflow interrupt does not occur.
-    reg = SREG;
-    cli();
-
-    // Check if overflow occured.
-    if (timer1_high_count >= 0x8FFF){
-        overflow = true;
-        timer1_high_count -= 0x8FFF;
-    }
-
-    // Obtain the true clock value. 
-    clock = (timer1_high_count<<16) | TCNT1;
-
-    // Restore interrupts:
-    SREG = sreg; 
-
-    // While it is time to run the top task:
-    while(tasks[next_task].wtime >= clock){
-
-        // If overflow occureed, update times of all tasks:
-        if (overflow){
-            ti=next_task;
-            do{
-                tasks[ti].wtime -= 0x8FFF<<16; 
-                ti = tasks[ti].next;
-            }while(ti!=next_task);
-        }
-
-        run_task();
-
-        // In the rest of the loop body, we evaluate
-        // if it is time to run the next task again.
-
-        SREG = sreg;
-        cli();
-
-        // Clear interrupt flag. Page 114:
-        TIFR1 &= ~(1<<TIMSK1);
-
-        // Set wakeup time:
-        OCRA1 = task[next_task].wtime & 0xFFFF; 
-
-        // Check if overflow occured.
-        if (timer1_high_count >= 0x8FFF){
-            overflow = true;
-            timer1_high_count -= 0x8FFF;
-        }
-
-        // Obtain the true clock value. 
-        clock = (timer1_high_count<<16) | TCNT1;
-
-        // restore interrupts.
-        SREG = sreg;
-    }
-}
-
-
 void wait_for_task(){
     ENTER();
     TR(tasks[next_task].wtime);
@@ -465,7 +470,7 @@ void wait_for_task(){
     
 }
 
-void run_task(){
+void run_next_task(){
     switch(tasks[next_task].mode){
       case ServoTask:
         calcServoTaskWtime(next_task);
@@ -476,7 +481,7 @@ void run_task(){
         executePwmTask(next_task);
         break;
       case CallbackTask:
-        scheduleCallbackTask(next_task);
+        calcCallbackTaskWtime(next_task);
         tasks[next_task].params.callback.func();
         break;
       case NoTask:
@@ -488,3 +493,4 @@ void run_task(){
     schedule_task(next_task);
     LEAVE();
 }
+

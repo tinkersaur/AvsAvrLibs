@@ -56,6 +56,5 @@ TaskIndex set_task_wtime(TaskIndex id, Period t);
 
 TaskIndex cancel_task(TaskIndex ti);
 
-void run_task();
-
+extern volatile bool timer1_high_count;
 #endif
