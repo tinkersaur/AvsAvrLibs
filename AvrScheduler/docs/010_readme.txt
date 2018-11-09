@@ -37,17 +37,17 @@
   
  *** TODO ***
 
-- Task structure no longer needs overrun member.
-- remove dead code in ISR(COMPA)
-- in schedule_task(), check if the current position of the task is 
-  good, and no reshuffling required.
+- implement add_trigger_task.
+- use the same approach as used in Servo library to generatre better PWM.
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
 - Add a function that reports how much time we got before the next task.
-- see how servo library is implemented. Per documentation it is
-  able to drive up to 12 servros. See how it is done.
 - dynamic allocation of tasks.
-- use the same approach as used in Servo library to generatre better PWM.
+- in schedule_task(), check if the current position of the task is 
+  good, and no reshuffling required.
 - other types of tasks that can be implemented:
+    trigger_boolean:
+        : period
+        : address of a boolean.
     swipe servo
         : pin
         : min angle
@@ -55,9 +55,6 @@
         : swing duration
         : pause
         : offset.
-    trigger_boolean:
-        : period
-        : address of a boolean.
     servo motions:
         : pin
         : num_motion_modes ... mode

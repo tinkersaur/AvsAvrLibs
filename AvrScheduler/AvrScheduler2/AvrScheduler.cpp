@@ -47,7 +47,6 @@ struct Task{
   uint8_t mode;
   Period wtime; // wakeup time.
   uint8_t priority;
-  bool clock_overrun; // TODO: delete this member.
   TaskParameters params;
   TaskIndex next;
   TaskIndex prev;
@@ -214,11 +213,6 @@ ISR(TIMER1_COMPA_vect){
     bool overflow;
     uint32_t clock;
 
-    // We want to obtain the true clock value. To do that, we temporaraly
-    // disable all interrupts, so that overflow interrupt does not occur.
-    // sreg = SREG;
-    // cli();
-
     // Check if overflow occured.
     if (timer1_high_count >= 0x8FFF){
         overflow = true;
@@ -229,9 +223,6 @@ ISR(TIMER1_COMPA_vect){
     clock = (((uint32_t)timer1_high_count)<<16) | TCNT1;
     
     TR(clock);
-
-    // Restore interrupts:
-    // SREG = sreg; 
 
     // While it is time to run the top task:
     while(tasks[next_task].mode != NoTask
@@ -253,9 +244,6 @@ ISR(TIMER1_COMPA_vect){
         // In the rest of the loop body, we evaluate
         // if it is time to run the next task again.
 
-        // SREG = sreg;
-        // cli();
-
         // Clear interrupt flag. Page 114:
         TIFR1 &= ~(1<<OCF1A);
 
@@ -270,9 +258,6 @@ ISR(TIMER1_COMPA_vect){
 
         // Obtain the true clock value. 
         clock = (timer1_high_count<<16) | TCNT1;
-
-        // restore interrupts.
-        // SREG = sreg;
     }
     LEAVE();
 }
@@ -352,7 +337,6 @@ TaskIndex add_motor_task(Priority priority, PinIndex pin, Duty initial_duty){
 void calcMotorTaskWtime(TaskIndex ti){
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
-  Period ltime = task.wtime; // last time.
   switch(params.phase){
     case 0:
       params.on_duration = params.duty * TicksPerMotorDutyLevel;
@@ -365,13 +349,11 @@ void calcMotorTaskWtime(TaskIndex ti){
       error();
       break;
   }
-  task.clock_overrun = (task.wtime < ltime); 
 }
 
 void calcServoTaskWtime(TaskIndex ti){
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
-  Period ltime = task.wtime; // last time.
   switch(params.phase){
     case 0:
       // TR(params.duty);
@@ -388,17 +370,14 @@ void calcServoTaskWtime(TaskIndex ti){
       error();
       break;
   }
-  task.clock_overrun = (task.wtime < ltime); 
 }
 
 void calcCallbackTaskWtime(TaskIndex ti){
   ENTER();
   Task & task = tasks[ti];
-  Period ltime = task.wtime; // last time.
   CallbackParameters & params = tasks[next_task].params.callback;
   task.wtime += (params.period>>2);
   TR(task.wtime);
-  task.clock_overrun = (task.wtime < ltime); 
   LEAVE();
 }
 
