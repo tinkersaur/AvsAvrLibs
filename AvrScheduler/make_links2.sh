@@ -4,8 +4,11 @@
 
 L=`ls -x`
 for F in $L ; do
-    if test "$F" != docs -a  "$F" != AvrScheduler \
-       -a  "$F" != AvrScheduler2 -a -d "$F"; then
+    if test -d "$F" \
+       -a  "$F" != AvrScheduler \
+       -a  "$F" != AvrScheduler2 \
+       -a  "$F" != 080_test_timer_setup \
+       -a  "$F" != docs; then
         pushd "$F" > /dev/null
         echo pwd = `pwd`
         echo linking: ln -f ../AvrScheduler2/* .

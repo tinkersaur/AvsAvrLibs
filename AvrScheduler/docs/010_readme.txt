@@ -52,6 +52,9 @@
         : swing duration
         : pause
         : offset.
+    trigger_boolean:
+        : period
+        : address of a boolean.
     servo motions:
         : pin
         : num_motion_modes ... mode
