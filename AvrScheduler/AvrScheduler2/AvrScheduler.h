@@ -56,5 +56,10 @@ TaskIndex set_task_wtime(TaskIndex id, Period t);
 
 TaskIndex cancel_task(TaskIndex ti);
 
+/** Tell when the next task is scheduled. */
+Period next_task_time();
+
+void wake_tasks();
 extern volatile uint16_t timer1_high_count;
+
 #endif

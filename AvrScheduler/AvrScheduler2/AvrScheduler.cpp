@@ -11,7 +11,7 @@
 
 #define error() Serial.print("Scheduler error at "); Serial.println(__LINE__);
 
-// #define TRACE
+//#define TRACE
 #ifdef TRACE
     #define ENTER() Serial.print("Entering "); Serial.println(__func__); 
     #define LEAVE() Serial.print("Leaving "); Serial.println(__func__); 
@@ -25,6 +25,7 @@
     #define TR(X)
     #define REPORT_TASKS()
 #endif
+
 struct PwmParameters{
     Phase phase;
     Duty duty;
@@ -142,6 +143,14 @@ void report_tasks(){
     }
 }
 
+Period next_task_time(){
+    return tasks[next_task].wtime<<2; 
+}
+
+void wake_tasks(){
+   assert(OCF1A == 1);
+   TIFR1 |= (1<<OCF1A); 
+}
 /*
 Questions:
     - If I assign this to timer compare interrupt, this interrupt
@@ -200,16 +209,20 @@ ISR(TIMER1_COMPA_vect){
     // cleared when the Timer/Counter1 overflow Interrupt Vector
     // is executed.
 
-    unsigned char sreg;
-    bool etime; // Execute time. 
-    // etime is true if it is time to execute the new task.
+    // Note that TIMER1_COMPA_vect has higher priority than
+    // TIMER1_OVF_vect therefore we do not need to worry about
+    //  disabling interrupts.
+
+    ENTER();
+
+    // unsigned char sreg;
     bool overflow;
-    unsigned long clock;
+    uint32_t clock;
 
     // We want to obtain the true clock value. To do that, we temporaraly
     // disable all interrupts, so that overflow interrupt does not occur.
-    sreg = SREG;
-    cli();
+    // sreg = SREG;
+    // cli();
 
     // Check if overflow occured.
     if (timer1_high_count >= 0x8FFF){
@@ -218,21 +231,25 @@ ISR(TIMER1_COMPA_vect){
     }
 
     // Obtain the true clock value. 
-    clock = (timer1_high_count<<16) | TCNT1;
+    clock = (((uint32_t)timer1_high_count)<<16) | TCNT1;
+    
+    TR(clock);
 
     // Restore interrupts:
-    SREG = sreg; 
+    // SREG = sreg; 
 
     // While it is time to run the top task:
-    while(tasks[next_task].wtime >= clock){
+    while(tasks[next_task].wtime <= clock){
 
         // If overflow occureed, update times of all tasks:
         if (overflow){
             TaskIndex ti=next_task;
             do{
-                tasks[ti].wtime -= 0x8FFF<<16; 
+                if (tasks[ti].wtime >= 0x8FFF<<16){
+                    tasks[ti].wtime -= 0x8FFF<<16; 
+                }
                 ti = tasks[ti].next;
-            }while(ti!=next_task);
+            }while(tasks[ti].mode!=NoTask && ti!=next_task);
         }
 
         run_next_task();
@@ -240,11 +257,11 @@ ISR(TIMER1_COMPA_vect){
         // In the rest of the loop body, we evaluate
         // if it is time to run the next task again.
 
-        SREG = sreg;
-        cli();
+        // SREG = sreg;
+        // cli();
 
         // Clear interrupt flag. Page 114:
-        TIFR1 &= ~(1<<TIMSK1);
+        TIFR1 &= ~(1<<OCF1A);
 
         // Set wakeup time:
         OCR1A = tasks[next_task].wtime & 0xFFFF; 
@@ -259,8 +276,9 @@ ISR(TIMER1_COMPA_vect){
         clock = (timer1_high_count<<16) | TCNT1;
 
         // restore interrupts.
-        SREG = sreg;
+        // SREG = sreg;
     }
+    LEAVE();
 }
 
 
@@ -378,11 +396,14 @@ void calcServoTaskWtime(TaskIndex ti){
 }
 
 void calcCallbackTaskWtime(TaskIndex ti){
+  ENTER();
   Task & task = tasks[ti];
   Period ltime = task.wtime; // last time.
   CallbackParameters & params = tasks[next_task].params.callback;
   task.wtime += (params.period>>2);
+  TR(task.wtime);
   task.clock_overrun = (task.wtime < ltime); 
+  LEAVE();
 }
 
 TaskIndex set_task_duty(TaskIndex id, Duty duty){

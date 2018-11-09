@@ -37,7 +37,8 @@
   
  *** TODO ***
 
-- Why times are off by one?
+- Task structure no longer needs overrun member.
+- remove dead code in ISR(COMPA)
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
 - Add a function that reports how much time we got before the next task.
 - see how servo library is implemented. Per documentation it is
