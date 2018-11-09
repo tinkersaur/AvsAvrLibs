@@ -9,8 +9,7 @@
     and it is invoked with about correct frequency: every 0.26 seconds,
     which is 2**16*64/16e6.
 
-    TIMER1_COMPA_vect does not do anything but it does not screw up anything
-    either.
+    TIMER1_COMPA_vect Also works and is being invoked with about right frequency.
 
 */
 
@@ -20,6 +19,8 @@
 #include<avr/io.h> 
 
 volatile uint16_t timer1_high_count;
+volatile int phase=0;
+volatile int count=0;
 
 ISR(TIMER1_OVF_vect){
     // This is Timer1 overflow interrupt.
@@ -32,20 +33,23 @@ ISR(TIMER1_OVF_vect){
 }
 
 ISR(TIMER1_COMPA_vect){
+    count++;
+    OCR1A+=3000;
 }
 
-volatile int phase1=1;
-volatile int count1=1;
 void setup(){
   Serial.begin(9600);
-  TIMSK1 = 1;  // Let's enable only the overflow interrupt for now.
+  TIMSK1 = 3;  
   TCCR1A = 0;
   TCCR1B = 3;
+  OCR1A = 3000;
 }
 
 void loop() {
     Serial.print("timer: ");
     Serial.println((unsigned)timer1_high_count);
+    Serial.print("counter: ");
+    Serial.println((unsigned)count);
     delay(500);
     // if (timer1_high_count<0xFF){
     //     if (phase1==0){
