@@ -139,6 +139,10 @@ void wake_tasks(){
    assert(OCF1A == 1);
    TIFR1 |= (1<<OCF1A); 
 }
+
+uint32_t quick_millis(){
+    return ((((uint32_t)timer1_high_count)<<16) | TCNT1)/250; 
+}
 /*
 Questions:
     - If I assign this to timer compare interrupt, this interrupt

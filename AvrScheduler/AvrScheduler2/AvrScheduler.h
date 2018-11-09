@@ -63,4 +63,10 @@ void wake_tasks();
 
 extern volatile uint16_t timer1_high_count;
 
+/** A Quick but inaccurate way of calculating milliseconds.
+   This functions does not disable interrupts, therefore, provides
+   smother serial io, however, it is prone to errors when overruns occur.
+*/
+uint32_t quick_millis();
+
 #endif
