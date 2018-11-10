@@ -67,10 +67,20 @@ extern volatile uint16_t timer1_high_count;
 extern unsigned long logs[MaxNumLogs][2];
 extern uint8_t current_log;
 
-// MinServerDuty and MaxServerDuty must be exposed to to account for
-// variencies in servos.
-static const Duty MaxServoDuty = 470;
+// MinServerDuty and MaxServerDuty must be exposed to to account
+// for variencies in servos.  A user can go a little bit beyond
+// the range to allow for the variation between individaul
+// servos.
 
+#define MinServoDuty 155ul
+    // Per data sheet: 0.001 * 16e6 / 64 = 250,
+    // 155 is an imperical adjustment.
+
+#define MaxServoDuty 625ul
+    // To allow pulse variation 0.001 to 0.002 seconds,
+    //  MaxServoDuty - MinServoDuty should be calculated as
+    // 0.001*16e6/64 = 250, however the current value is chosen
+    // imperically to fit he servos that I have.
 
 void add_log(unsigned long timestamp, unsigned long info); 
 void report_logs();

@@ -10,7 +10,7 @@ TaskIndex servo_task, callback_task;
 // The values must be a little bit beyond the range
 // to allow for the variation between individaul servos.
 
-static const short min_angle=0;
+static const short min_angle=MinServoDuty;
 static const short max_angle=MaxServoDuty;
 Duty angle_step= 5;
 

@@ -37,11 +37,10 @@
   
  *** TODO ***
 
+- use the same approach as used in Servo library to generatre better PWM. (in progress).
 - implement add_trigger_task.
 - Need to be able to handle the case of empty queue: 
   - I should set up a wake up time somehow
-- Expose MinServerDuty and MaxServerDuty
-- use the same approach as used in Servo library to generatre better PWM. (in progress).
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
 - Add a function that reports how much time we got before the next task.
 - dynamic allocation of tasks.

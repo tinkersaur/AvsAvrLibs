@@ -85,13 +85,6 @@ volatile uint16_t timer1_high_count;
  
 /*** Servo ***/
 
-// These values must be a little bit beyond the range
-// to allow for the variation between individaul servos.
-
-static const Ticks TicksInZeroServoDuty = 155ul; // Old value 160
-    // Per data sheet: 0.001 * 16e6 / 64 = 250,
-    // 175 is an imperical adjustment.
-
 static const Ticks TicksPerServoDutyLevel = 1ul;
     // ^^ Calculated as: 0.001/250*16e6/64 = 1
 
@@ -389,9 +382,9 @@ void calcServoTaskWtime(TaskIndex ti){
   switch(params.phase){
     case 0:
       // TR(params.duty);
-      // TR(TicksInZeroServoDuty);
+      // TR(MinServoDuty);
       // TR(TicksPerServoDutyLevel);
-      params.on_duration = TicksInZeroServoDuty + params.duty * TicksPerServoDutyLevel;
+      params.on_duration = params.duty;
       // TR(params.en_duration);
       task.wtime += params.on_duration;
       break;
