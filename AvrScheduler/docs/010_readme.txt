@@ -38,7 +38,10 @@
  *** TODO ***
 
 - implement add_trigger_task.
-- use the same approach as used in Servo library to generatre better PWM.
+- Need to be able to handle the case of empty queue: 
+  - I should set up a wake up time somehow
+- Expose MinServerDuty and MaxServerDuty
+- use the same approach as used in Servo library to generatre better PWM. (in progress).
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
 - Add a function that reports how much time we got before the next task.
 - dynamic allocation of tasks.
@@ -66,16 +69,17 @@
         : pin
         : id
         : get_task_value(task_id).
-
     
 
 *** Observations ****
 
 - inline keyword is ignored.
-- The library is intended to work together with serial communication. It
-  has been observed that serial communication can interfere with
-  perfomance of servos. It is might be possible to improve
-  that in the future.
+- The library is intended to work together with serial communication. 
+  Relying on millis() however does not generate a good signals.
+  Trying to use Timer1. So far so good.
+  Also serial communication might be messing with millis() too.
+- Staggering tasks (using set_task_wtime())  is important. Almost
+  does not work without it, but works well with it.
 
 *** Notes ****
 

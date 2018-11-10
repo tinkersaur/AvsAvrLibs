@@ -2,17 +2,17 @@
 
 #define ServoPin 4
 
-short angle, dir;
+Duty angle, dir;
 
-byte servo_task;
+TaskIndex servo_task, callback_task;
 
 // These values work well with the servo I have.
 // The values must be a little bit beyond the range
 // to allow for the variation between individaul servos.
 
-static const short min_angle=2;
-static const short max_angle=250;
-short angle_step= 1;
+static const short min_angle=0;
+static const short max_angle=MaxServoDuty;
+Duty angle_step= 5;
 
 void update_angle(){
     if (angle>= max_angle){
@@ -24,13 +24,14 @@ void update_angle(){
         dir = angle_step;
     }
     angle += dir;
+    add_log(quick_micros(), angle);
     set_task_duty(servo_task, angle);
-    // Serial.print("angle: ");
-    // Serial.println(angle);
 }
 
 Period t;
 Period n;
+bool logs_reported = false;
+
 void setup(){
   // Initialize this first so that tracing can be done.
   //Serial.begin(9600);
@@ -38,11 +39,18 @@ void setup(){
   init_tasks();
 
   dir = angle_step;
-  angle = 128;
+  angle = 0;
   servo_task = add_servo_task(1, ServoPin, angle);
-  add_callback_task(2, 10000, update_angle);
+  set_task_wtime(servo_task, 300);
+  callback_task = add_callback_task(2, 20000, update_angle);
+  set_task_wtime(callback_task, 600);
+  wake_tasks();
 }
 
 void loop() {
-    run_task();
+  delay(1000);
+  if (!logs_reported){
+    report_logs();
+    logs_reported = true;
+  }
 }

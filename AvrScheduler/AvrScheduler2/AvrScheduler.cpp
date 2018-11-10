@@ -13,12 +13,19 @@
 
 //#define TRACE
 #include"macros.h"
+unsigned long logs[MaxNumLogs][2];
+uint8_t current_log;
+
+
+typedef unsigned long Ticks; 
+    // ^^^ A tick is a counter of Timer1,
+    // which is downscaled from the clock with ratio 64.
 
 struct PwmParameters{
     Phase phase;
     Duty duty;
     byte pin;
-    Period on_duration;
+    Ticks on_duration;
 }; 
 
 struct CallbackParameters{
@@ -62,9 +69,6 @@ volatile uint16_t timer1_high_count;
 
 // Note that the last task is the task t such that t.next == next_task.
 
-typedef unsigned long Ticks; // A tick is a counter of Timer1,
-                             // which is downscaled from the clock with ratio 64.
-
 /*  Clock 16MHz,
  *  For PWM motor:
  *  500Hz, with 255 levels of power yields 78.431 milliseconds. 
@@ -73,7 +77,8 @@ typedef unsigned long Ticks; // A tick is a counter of Timer1,
  *  1ms-2ms pulse with 255 levels yelds 7.843 milliseconds per level
  *  Prescaler 64 yields 1 tick.
  *  
- *  Note, everywhere here, "tick" means a 1/64 of milliseconds.
+ *  Note, everywhere here, "tick" means a 4 milliseconds, which is 64 of
+ *  the clock ticks.
  *  Millisecond would be a convinient choice, but floating point operations
  *  are slow, this precision suffice, and dividing on 64 is easy.
  */
@@ -83,18 +88,15 @@ typedef unsigned long Ticks; // A tick is a counter of Timer1,
 // These values must be a little bit beyond the range
 // to allow for the variation between individaul servos.
 
-static const Ticks MaxServoDuty = 255;
-static const Ticks TicksInZeroServoDuty = 255ul;
+static const Ticks TicksInZeroServoDuty = 155ul; // Old value 160
     // Per data sheet: 0.001 * 16e6 / 64 = 250,
-    // However we tweak so that to 
-    // TicksInZeroServoDuty + MaxServoDuty * TicksPerServoDutyLevel  == MotorPeriod == 255*2.
+    // 175 is an imperical adjustment.
 
 static const Ticks TicksPerServoDutyLevel = 1ul;
-    // ^^ Calculated as: 0.001/255*16e6/64 = 0.98
+    // ^^ Calculated as: 0.001/250*16e6/64 = 1
 
-static const Ticks ServoPeriod = 510ul; // This is 50Hz.
-    // ^^ calculated as 0.002*16e6/64 = 500, but taking into account
-    // round off errors, we set it to 505.
+static const Ticks ServoPeriod = 5000ul; // This is 50Hz.
+    // ^^ calculated as 0.02*16e6/64 = 5000
 
 /*** Motor ***/
 
@@ -134,13 +136,36 @@ Period next_task_time(){
     return tasks[next_task].wtime<<2; 
 }
 
+void add_log(unsigned long timestamp, unsigned long info){
+    if (current_log < MaxNumLogs){
+        logs[current_log][0]=timestamp;
+        logs[current_log][1]=info;
+        current_log++;
+    }
+}
+
+void report_logs(){
+    Serial.println("*** Logs ***");
+    for(uint8_t i=0; i<MaxNumLogs; i++){
+        Serial.print(logs[i][0]);
+        Serial.print(" : ");
+        Serial.print(i==0?0 : (logs[i][0]- logs[i-1][0]));
+        Serial.print(" : ");
+        Serial.println(logs[i][1]);
+    } 
+}
+
 void wake_tasks(){
-   assert(OCF1A == 1);
+   // assert(OCF1A == 1);
    TIFR1 |= (1<<OCF1A); 
 }
 
 uint32_t quick_millis(){
     return ((((uint32_t)timer1_high_count)<<16) | TCNT1)/250; 
+}
+
+uint32_t quick_micros(){
+    return ((((uint32_t)timer1_high_count)<<16) | TCNT1)*4; 
 }
 /*
 Questions:
@@ -205,7 +230,8 @@ ISR(TIMER1_COMPA_vect){
 
     // Note that TIMER1_COMPA_vect has higher priority than
     // TIMER1_OVF_vect therefore we do not need to worry about
-    //  disabling interrupts.
+    // disabling interrupts. However we need to check if
+    // the overflow occured, and increment the time1_high_count
 
     ENTER();
 
@@ -213,6 +239,12 @@ ISR(TIMER1_COMPA_vect){
     bool overflow;
     uint32_t clock;
 
+    //assert(TOV1 ==0);
+
+    if (TIFR1 & (1<<TOV1)){
+        TIFR1 &=~(((uint8_t)1)<<TOV1);
+        timer1_high_count++;
+    }
     // Check if overflow occured.
     if (timer1_high_count >= 0x8FFF){
         overflow = true;
@@ -373,12 +405,12 @@ void calcServoTaskWtime(TaskIndex ti){
 }
 
 void calcCallbackTaskWtime(TaskIndex ti){
-  ENTER();
+  // ENTER();
   Task & task = tasks[ti];
   CallbackParameters & params = tasks[next_task].params.callback;
   task.wtime += (params.period>>2);
-  TR(task.wtime);
-  LEAVE();
+  // TR(task.wtime);
+  // LEAVE();
 }
 
 TaskIndex set_task_duty(TaskIndex id, Duty duty){
@@ -387,7 +419,7 @@ TaskIndex set_task_duty(TaskIndex id, Duty duty){
 }
 
 TaskIndex set_task_wtime(TaskIndex id, Period t){
-  tasks[id].wtime = t; 
+  tasks[id].wtime = t>>2; 
   schedule_task(id);
 }
 
@@ -399,10 +431,12 @@ void executePwmTask(TaskIndex ti){
     case 0:
       params.phase = 1;
       digitalWrite(params.pin, 1);
+      // add_log(quick_micros(), 1);
       break;
     case 1:
       params.phase = 0;
       digitalWrite(params.pin, 0);
+      // add_log(quick_micros(), 0);
       break;
   }
 }
@@ -482,6 +516,7 @@ void run_next_task(){
         break;
       case CallbackTask:
         calcCallbackTaskWtime(next_task);
+        //add_log(quick_micros(), 3);
         tasks[next_task].params.callback.func();
         break;
       case NoTask:

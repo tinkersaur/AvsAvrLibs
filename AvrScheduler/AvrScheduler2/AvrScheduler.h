@@ -17,7 +17,7 @@ typedef unsigned long Period;
 typedef byte Phase;
   // ^^^ A task may have several phases. For example, pin is on, or pin is off.
   
-typedef byte Duty;
+typedef uint16_t Duty;
   // ^^^ A parameter of the task, which is most likely to be
   //     The angle of the servo, or the power of the motor.
   //     By convention, 0 is 0%, and 255 is 100%, for the motor,
@@ -63,10 +63,23 @@ void wake_tasks();
 
 extern volatile uint16_t timer1_high_count;
 
+#define MaxNumLogs 30
+extern unsigned long logs[MaxNumLogs][2];
+extern uint8_t current_log;
+
+// MinServerDuty and MaxServerDuty must be exposed to to account for
+// variencies in servos.
+static const Duty MaxServoDuty = 470;
+
+
+void add_log(unsigned long timestamp, unsigned long info); 
+void report_logs();
+
 /** A Quick but inaccurate way of calculating milliseconds.
    This functions does not disable interrupts, therefore, provides
    smother serial io, however, it is prone to errors when overruns occur.
 */
 uint32_t quick_millis();
+uint32_t quick_micros();
 
 #endif
