@@ -10,7 +10,7 @@ TaskIndex motor_task, power_task;
 
 static const short min_power=1;
 static const short max_power=30;
-Duty power_step= 1;
+Duty power_step=1;
 bool logs_reported = false;
 
 void update_power(){

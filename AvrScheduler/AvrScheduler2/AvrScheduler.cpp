@@ -18,6 +18,8 @@
     #define SETUP_ISR
 #endif
 
+#define ADD_LOG(timestamp, value) 
+
 #include"macros.h"
 
 
@@ -36,6 +38,11 @@ struct PwmParameters{
     Ticks on_duration;
 }; 
 
+struct TriggerParameters{
+  volatile bool * value;
+  Period period;
+};
+
 struct CallbackParameters{
   void (*func)();
   Period period;
@@ -43,6 +50,7 @@ struct CallbackParameters{
 
 union TaskParameters{
   PwmParameters pwm;
+  TriggerParameters trigger;
   CallbackParameters callback;
 };
 
@@ -51,6 +59,7 @@ enum TaskType{
   NoTask, // Empty slot which can be used.
   ServoTask, 
   MotorTask,
+  TriggerTask,
   CallbackTask
 };
   
@@ -113,6 +122,7 @@ static void schedule_task(TaskIndex);
 void run_next_task();
 static void calcMotorTaskWtime(TaskIndex ti);
 static void calcServoTaskWtime(TaskIndex ti);
+static void calcTriggerTaskWtime(TaskIndex ti);
 static void calcCallbackTaskWtime(TaskIndex ti);
 
 void report_tasks(){
@@ -145,6 +155,10 @@ void add_log(unsigned long timestamp, unsigned long info){
     }
 }
 
+bool logs_full(){
+    return current_log >= MaxNumLogs;
+}
+
 void report_logs(){
     Serial.println("*** Logs ***");
     for(uint8_t i=0; i<MaxNumLogs; i++){
@@ -158,6 +172,8 @@ void report_logs(){
 
 void wake_tasks(){
    // assert(OCF1A == 1);
+   // ENTER();
+   // TR(TIFR1);
    TIFR1 |= (1<<OCF1A); 
 }
 
@@ -170,6 +186,14 @@ uint32_t quick_micros(){
 }
 
 static void setup_timers(){
+    // clear overflow just for good measure:
+    cli();
+    TIFR1 &= ~(1<<OCF1A);
+    TIFR1 &= ~(1<<OCF1A);
+    TIFR1 &= ~(1<<TOV1);
+    TCNT1 = 0;
+
+    #ifdef SETUP_ISR
     // Configure Timer1:
 
     // TIMSK1 = [ – | – | ICIE1 | – | – | OCIE1B | OCIE1A | TOIE1 ] -- p 139.
@@ -194,10 +218,18 @@ static void setup_timers(){
     TCCR1A = 0;
     TCCR1B = 3;
 
+    #else
+        TIMSK1 = 0;  
+        TCCR1A = 0;
+        TCCR1B = 0;
+    #endif
+
+    timer1_high_count = 0;
+    sei();
 }
 
-#ifdef SETUP_ISR
 
+#ifdef SETUP_ISR
 ISR(TIMER1_OVF_vect){
     // This is Timer1 overflow interrupt.
 
@@ -207,10 +239,17 @@ ISR(TIMER1_OVF_vect){
     // is executed.
     timer1_high_count++;
 }
+#endif
 
-/* ISR() defines an interrupt vector*/
-/* Timer1 CompareA interrupt.*/
-ISR(TIMER1_COMPA_vect){
+#ifdef SETUP_ISR
+
+    /* ISR() defines an interrupt vector*/
+    /* Timer1 CompareA interrupt.*/
+    ISR(TIMER1_COMPA_vect)
+#else
+    void simulate_compare_interrupt()  
+#endif
+{
         
     // Bit OCF1A in TIFR1 is set, when the timer counter
     // equals to OCR1A, however, Per p 140, OCF1A is automatically
@@ -224,13 +263,17 @@ ISR(TIMER1_COMPA_vect){
 
     ENTER();
 
-    // unsigned char sreg;
     bool overflow;
     uint32_t clock;
 
     //assert(TOV1 ==0);
 
+    // TR(TIFR1);
+    ADD_LOG(quick_millis(), 77010);
+
     if (TIFR1 & (1<<TOV1)){
+        MSG("Overflow has occured:");
+        ADD_LOG(quick_millis(), 77015);
         TIFR1 &=~(((uint8_t)1)<<TOV1);
         timer1_high_count++;
     }
@@ -242,53 +285,75 @@ ISR(TIMER1_COMPA_vect){
 
     // Obtain the true clock value. 
     clock = (((uint32_t)timer1_high_count)<<16) | TCNT1;
-    
-    TR(clock);
 
-    // While it is time to run the top task:
-    while(tasks[next_task].mode != NoTask
-        && tasks[next_task].wtime <= clock){
-
+    // Even if it is not time to run the next task, we
+    // must setup the next wakeup time correctly.
+    bool done = false;
+    bool time_set = false;
+    while(!done){
+        done = true;
         // If overflow occureed, update times of all tasks:
         if (overflow){
+            overflow = false;
             TaskIndex ti=next_task;
             do{
-                if (tasks[ti].wtime >= 0x8FFF<<16){
-                    tasks[ti].wtime -= 0x8FFF<<16; 
+                if (tasks[ti].wtime >= 0x8FFFul<<16){
+                    tasks[ti].wtime -= 0x8FFFul<<16; 
                 }
                 ti = tasks[ti].next;
             }while(tasks[ti].mode!=NoTask && ti!=next_task);
         }
 
-        run_next_task();
+        // While it is time to run the top task:
+
+
+        ADD_LOG(quick_millis(), 77020);
+        ADD_LOG(quick_millis(), tasks[next_task].wtime);
+        if (  tasks[next_task].mode != NoTask
+           && tasks[next_task].wtime <= clock){
+
+            ADD_LOG(quick_millis(), 77030);
+            ADD_LOG(quick_millis(), clock);
+            MSG("It is time to run the next task:");
+            TR(clock);
+            run_next_task();
+            done = false;
+            time_set = false;
+        } else {
+            ADD_LOG(quick_millis(), 77040);
+        }
 
         // In the rest of the loop body, we evaluate
         // if it is time to run the next task again.
 
-        // Clear interrupt flag. Page 114:
-        TIFR1 &= ~(1<<OCF1A);
+        if (tasks[next_task].mode != NoTask && !time_set){
+            // Clear interrupt flag. Page 114:
+            TIFR1 &= ~(1<<OCF1A);
 
-        // Set wakeup time:
-        OCR1A = tasks[next_task].wtime & 0xFFFF; 
+            MSG("Setting up the next wakeup time:");
+            TR(tasks[next_task].wtime);
 
-        // Check if overflow occured.
-        if (timer1_high_count >= 0x8FFF){
-            overflow = true;
-            timer1_high_count -= 0x8FFF;
+            // Set wakeup time:
+            OCR1A = tasks[next_task].wtime & 0xFFFF; 
+
+            // Check if overflow occured.
+            if (timer1_high_count >= 0x8FFF){
+                overflow = true;
+                timer1_high_count -= 0x8FFF;
+            }
+
+            // Obtain the true clock value. 
+            clock = (timer1_high_count<<16) | TCNT1;
+            time_set = true;
         }
-
-        // Obtain the true clock value. 
-        clock = (timer1_high_count<<16) | TCNT1;
     }
+    ADD_LOG(quick_millis(), 77050);
     LEAVE();
 }
-#endif
 
 void init_tasks(){
   // ENTER();
-  #ifndef TRACE_SCHEDULER
-    setup_timers();
-  #endif
+  setup_timers();
   next_task = 0;
   for(TaskIndex i = 0; i < MaxNumTasks; i++){
     tasks[i].next = (i+1) % MaxNumTasks;
@@ -313,6 +378,19 @@ TaskIndex add_task(){
     i = tasks[i].next;
     if (i == next_task) return MaxNumTasks;
   }
+}
+
+TaskIndex add_trigger_task(Priority priority, Period period, volatile bool * value_ptr){
+  TaskIndex i = add_task();
+  if (i >= MaxNumTasks) return i;
+  tasks[i].priority = priority;
+  tasks[i].mode = TriggerTask;
+  tasks[i].wtime = 0;
+  TriggerParameters & params = tasks[i].params.trigger;
+  params.value = value_ptr;
+  params.period = period;
+  schedule_task(i);
+  return i;
 }
 
 TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func){
@@ -404,6 +482,16 @@ void calcServoTaskWtime(TaskIndex ti){
   // LEAVE();
 }
 
+void calcTriggerTaskWtime(TaskIndex ti){
+  // ENTER();
+  Task & task = tasks[ti];
+  TriggerParameters & params = tasks[next_task].params.trigger;
+  // TR(task.wtime);
+  task.wtime += (params.period>>2);
+  // TR(task.wtime);
+  // LEAVE();
+}
+
 void calcCallbackTaskWtime(TaskIndex ti){
   // ENTER();
   Task & task = tasks[ti];
@@ -432,12 +520,12 @@ void executePwmTask(TaskIndex ti){
     case 0:
       params.phase = 1;
       digitalWrite(params.pin, 1);
-      // add_log(quick_micros(), 1);
+      // ADD_LOG(quick_micros(), 1);
       break;
     case 1:
       params.phase = 0;
       digitalWrite(params.pin, 0);
-      // add_log(quick_micros(), 0);
+      // ADD_LOG(quick_micros(), 0);
       break;
   }
 }
@@ -513,8 +601,13 @@ void run_next_task(){
         executePwmTask(next_task);
         calcMotorTaskWtime(next_task);
         break;
+      case TriggerTask:
+        //ADD_LOG(quick_micros(), 3);
+        *(tasks[next_task].params.trigger.value)=true;
+        calcTriggerTaskWtime(next_task);
+        break;
       case CallbackTask:
-        //add_log(quick_micros(), 3);
+        //ADD_LOG(quick_micros(), 3);
         tasks[next_task].params.callback.func();
         calcCallbackTaskWtime(next_task);
         break;

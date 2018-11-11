@@ -29,6 +29,7 @@
  060_test_overrun
  070_test_initial_delay
  080_test_cancel_task // Not implemented.
+ 090_test_empty_queue // Not implemented.
 
  *** In progress ***
 
@@ -37,10 +38,7 @@
   
  *** TODO ***
 
-- use the same approach as used in Servo library to generatre better PWM. (in progress).
-- implement add_trigger_task.
-- Need to be able to handle the case of empty queue: 
-  - I should set up a wake up time somehow
+- print tasks in the order they will be invoked.
 - improve logging by allowing a value to be reported.
 - Motor with duty level 0% or 100% could be excluded from the queue.
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.

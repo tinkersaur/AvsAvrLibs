@@ -6,6 +6,11 @@
 /** Updated on 2018-10-28 12:11 */
 #include<stdint.h>
 
+
+// Uncomment the following line to switch into tracing mode.
+// In tracing mode, run_next_task() has to be manually invoked.
+// #define TRACE_SCHEDULER
+
 typedef byte TaskIndex;
   // ^^^ Must be big enough to accomodate MaxTaskIndex
 
@@ -42,6 +47,9 @@ void init_tasks();
 TaskIndex add_motor_task(Priority priority, PinIndex pin, Duty initial_duty);
 
 TaskIndex add_servo_task(Priority priority, PinIndex pin, Duty initial_duty);
+
+TaskIndex add_trigger_task(Priority priority, Period period,
+    volatile bool * value_ptr);
 
 TaskIndex add_callback_task(Priority priority, Period period, TaskFunc func);
 
@@ -84,12 +92,16 @@ extern uint8_t current_log;
 
 void add_log(unsigned long timestamp, unsigned long info); 
 
+bool logs_full();
+
 /** Other logging forms that could be added later: 
 void add_log(char * three_char_label, int value);
 void add_log(unsigned long timestamp, char * six_char_msg); 
 */
 
 void report_logs();
+
+void report_tasks();
 
 /** A Quick but inaccurate way of calculating milliseconds.
    This functions does not disable interrupts, therefore, provides
@@ -100,12 +112,10 @@ void report_logs();
 uint32_t quick_millis();
 uint32_t quick_micros();
 
-// I need this function periodically for debugging.
-void run_next_task();
 
-// Uncomment the following line to switch into tracing mode.
-// In tracing mode, run_next_task() has to be manually invoked.
-
-// #define TRACE_SCHEDULER
+#ifdef TRACE_SCHEDULER
+    void simulate_compare_interrupt();  
+    void run_next_task();
+#endif
 
 #endif
