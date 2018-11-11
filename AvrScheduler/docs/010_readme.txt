@@ -41,11 +41,17 @@
 - implement add_trigger_task.
 - Need to be able to handle the case of empty queue: 
   - I should set up a wake up time somehow
+- improve logging by allowing a value to be reported.
+- Motor with duty level 0% or 100% could be excluded from the queue.
 - Think about a good way to report an error. Right now macro error() reports an error to a serial port.
 - Add a function that reports how much time we got before the next task.
 - dynamic allocation of tasks.
 - in schedule_task(), check if the current position of the task is 
   good, and no reshuffling required.
+- Driving motors with 100Hz PWM works just fine with the H-Bridge and
+  the motors I have. However playing with these numbers lead to unexpected
+  results. for example: period=5000 and step=20 caused a lot of problems.
+  Need to play more with these constants. 
 - other types of tasks that can be implemented:
     trigger_boolean:
         : period
@@ -69,6 +75,10 @@
         : id
         : get_task_value(task_id).
     
+*** Usage notes ***
+
+- The library has "#define TRACE_SCHEDULER" which
+can switch the code into a mode which is much easier to debug.
 
 *** Observations ****
 
@@ -95,6 +105,14 @@
   unfortunate result of messing up Serial IO. Note that  TIM1_OVF
   is used in MCU datasheet. See link .../avr_intr_vectors below.
 
+- Driving motors with 100Hz PWM works just fine with the H-Bridge and
+  the motors I have. However playing with these numbers lead to unexpected
+  results. for example: period=5000 and step=20 caused a lot of problems.
+  Need to play more with these constants. 
+
+- Using staggering tasks and using set_task_wtime() can make a huge
+  differences.
+
 *** Links ***
   
  Note that PWM for controlling servo is different from controlling a motor.
@@ -108,3 +126,4 @@
  https://www.norwegiancreations.com/2017/09/arduino-tutorial-using-millis-instead-of-delay/
  https://www.norwegiancreations.com/2018/10/arduino-tutorial-avoiding-the-overflow-issue-when-using-millis-and-micros/
  http://ee-classes.usc.edu/ee459/library/documents/avr_intr_vectors/
+ http://www.avr-tutorials.com/interrupts/avr-external-interrupt-c-programming

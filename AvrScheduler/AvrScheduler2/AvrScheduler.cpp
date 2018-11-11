@@ -11,8 +11,16 @@
 
 #define error() Serial.print("Scheduler error at "); Serial.println(__LINE__);
 
-//#define TRACE
+
+#ifdef TRACE_SCHEDULER
+    #define TRACE
+#else
+    #define SETUP_ISR
+#endif
+
 #include"macros.h"
+
+
 unsigned long logs[MaxNumLogs][2];
 uint8_t current_log;
 
@@ -77,8 +85,8 @@ volatile uint16_t timer1_high_count;
  *  1ms-2ms pulse with 255 levels yelds 7.843 milliseconds per level
  *  Prescaler 64 yields 1 tick.
  *  
- *  Note, everywhere here, "tick" means a 4 milliseconds, which is 64 of
- *  the clock ticks.
+ *  Note, everywhere here, "tick" means a 4 milliseconds, which is 64
+ *  clock ticks.
  *  Millisecond would be a convinient choice, but floating point operations
  *  are slow, this precision suffice, and dividing on 64 is easy.
  */
@@ -93,16 +101,16 @@ static const Ticks ServoPeriod = 5000ul; // This is 50Hz.
 
 /*** Motor ***/
 
-static const Ticks MaxMotorDuty = 255;
+static const Ticks MaxMotorDuty = 250;
 
-static const Ticks TicksPerMotorDutyLevel = 2ul;
-// ^^ Calculated as: 1e6*0.002/255*64
+static const Ticks MotorPeriod = 2500ul;
+    //^^^ Calculated as 16e6/64*0.01
 
-static const Period MotorPeriod = 510ul;
-// 1e6*0.002
+static const Ticks TicksPerMotorDutyLevel = 10ul;
+// ^^ Calculated as: MotorPeriod/MaxMotorDuty = 10.
 
 static void schedule_task(TaskIndex);
-static void run_next_task();
+void run_next_task();
 static void calcMotorTaskWtime(TaskIndex ti);
 static void calcServoTaskWtime(TaskIndex ti);
 static void calcCallbackTaskWtime(TaskIndex ti);
@@ -142,8 +150,8 @@ void report_logs(){
     for(uint8_t i=0; i<MaxNumLogs; i++){
         Serial.print(logs[i][0]);
         Serial.print(" : ");
-        Serial.print(i==0?0 : (logs[i][0]- logs[i-1][0]));
-        Serial.print(" : ");
+        //Serial.print(i==0?0 : (logs[i][0]- logs[i-1][0]));
+        //Serial.print(" : ");
         Serial.println(logs[i][1]);
     } 
 }
@@ -160,16 +168,6 @@ uint32_t quick_millis(){
 uint32_t quick_micros(){
     return ((((uint32_t)timer1_high_count)<<16) | TCNT1)*4; 
 }
-/*
-Questions:
-    - If I assign this to timer compare interrupt, this interrupt
-      will be disabled until the function returns?
-
-    Links:
-    http://www.avr-tutorials.com/interrupts/avr-external-interrupt-c-programming
-*/
-
-// TSR(TIMER1COMPA) ???
 
 static void setup_timers(){
     // Configure Timer1:
@@ -198,7 +196,6 @@ static void setup_timers(){
 
 }
 
-#define SETUP_ISR
 #ifdef SETUP_ISR
 
 ISR(TIMER1_OVF_vect){
@@ -210,7 +207,6 @@ ISR(TIMER1_OVF_vect){
     // is executed.
     timer1_high_count++;
 }
-
 
 /* ISR() defines an interrupt vector*/
 /* Timer1 CompareA interrupt.*/
@@ -290,7 +286,9 @@ ISR(TIMER1_COMPA_vect){
 
 void init_tasks(){
   // ENTER();
-  setup_timers();
+  #ifndef TRACE_SCHEDULER
+    setup_timers();
+  #endif
   next_task = 0;
   for(TaskIndex i = 0; i < MaxNumTasks; i++){
     tasks[i].next = (i+1) % MaxNumTasks;
@@ -301,6 +299,7 @@ void init_tasks(){
     // TR(tasks[i].prev = i-1);
   }
   tasks[0].prev = MaxNumTasks - 1;
+  current_log = 0;
 }
 
 /** Returns a task index, or MaxNumTasks if there is not enough room. **/
@@ -360,8 +359,11 @@ TaskIndex add_motor_task(Priority priority, PinIndex pin, Duty initial_duty){
 }
 
 void calcMotorTaskWtime(TaskIndex ti){
+  ENTER();
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
+  TR(task.wtime);
+  TR(params.phase);
   switch(params.phase){
     case 0:
       params.on_duration = params.duty * TicksPerMotorDutyLevel;
@@ -374,11 +376,15 @@ void calcMotorTaskWtime(TaskIndex ti){
       error();
       break;
   }
+  TR(task.wtime);
+  LEAVE();
 }
 
 void calcServoTaskWtime(TaskIndex ti){
+  // ENTER();
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
+  // TR(params.phase);
   switch(params.phase){
     case 0:
       // TR(params.duty);
@@ -395,12 +401,14 @@ void calcServoTaskWtime(TaskIndex ti){
       error();
       break;
   }
+  // LEAVE();
 }
 
 void calcCallbackTaskWtime(TaskIndex ti){
   // ENTER();
   Task & task = tasks[ti];
   CallbackParameters & params = tasks[next_task].params.callback;
+  // TR(task.wtime);
   task.wtime += (params.period>>2);
   // TR(task.wtime);
   // LEAVE();
@@ -416,7 +424,7 @@ TaskIndex set_task_wtime(TaskIndex id, Period t){
   schedule_task(id);
 }
 
-/* This works for both Motors and for Servos.
+/** This works for both Motors and for Servos.
 */
 void executePwmTask(TaskIndex ti){
   PwmParameters & params = tasks[next_task].params.pwm;
@@ -434,12 +442,10 @@ void executePwmTask(TaskIndex ti){
   }
 }
 
-/* pop the first task and insert it according
- *  to the time and priority
+/** Pop the task and insert it according to its time and priority.
  */
-
 void schedule_task(TaskIndex ti){
-  ENTER(); 
+  // ENTER(); 
   // Pop the first element.
  
   if (ti == next_task){
@@ -452,7 +458,7 @@ void schedule_task(TaskIndex ti){
   tasks[ni].prev = bi;
   // TR(next_task);
 
-  MSG("Insert the element back according to time and priority.");
+  // MSG("Insert the element back according to time and priority.");
  
   bool last_task = false;
   ni = next_task;
@@ -470,10 +476,10 @@ void schedule_task(TaskIndex ti){
         last_task = true;
         break;
     }
-    TR(ni);
+    // TR(ni);
   }
-  MSG("Found a place to insert a task.");
-  TR(ni);
+  // MSG("Found a place to insert a task.");
+  // TR(ni);
   if (ni == next_task && !last_task){
     next_task = ti; 
   }
@@ -482,8 +488,8 @@ void schedule_task(TaskIndex ti){
   tasks[ni].prev=ti;
   tasks[bi].next=ti;
   tasks[ti].prev=bi;
-  REPORT_TASKS();
-  LEAVE(); 
+  // REPORT_TASKS();
+  // LEAVE(); 
 }
 
 TaskIndex cancel_task(TaskIndex ti){
@@ -491,8 +497,8 @@ TaskIndex cancel_task(TaskIndex ti){
     schedule_task(ti);
 }
 void wait_for_task(){
-    ENTER();
-    TR(tasks[next_task].wtime);
+    // ENTER();
+    // TR(tasks[next_task].wtime);
     while(micros()<tasks[next_task].wtime);
     
 }
@@ -500,17 +506,17 @@ void wait_for_task(){
 void run_next_task(){
     switch(tasks[next_task].mode){
       case ServoTask:
-        calcServoTaskWtime(next_task);
         executePwmTask(next_task);
+        calcServoTaskWtime(next_task);
         break;
       case MotorTask:
-        calcMotorTaskWtime(next_task);
         executePwmTask(next_task);
+        calcMotorTaskWtime(next_task);
         break;
       case CallbackTask:
-        calcCallbackTaskWtime(next_task);
         //add_log(quick_micros(), 3);
         tasks[next_task].params.callback.func();
+        calcCallbackTaskWtime(next_task);
         break;
       case NoTask:
         return;
@@ -519,6 +525,6 @@ void run_next_task(){
         return;
     }
     schedule_task(next_task);
-    LEAVE();
+    // LEAVE();
 }
 

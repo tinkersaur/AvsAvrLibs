@@ -83,13 +83,29 @@ extern uint8_t current_log;
     // imperically to fit he servos that I have.
 
 void add_log(unsigned long timestamp, unsigned long info); 
+
+/** Other logging forms that could be added later: 
+void add_log(char * three_char_label, int value);
+void add_log(unsigned long timestamp, char * six_char_msg); 
+*/
+
 void report_logs();
 
 /** A Quick but inaccurate way of calculating milliseconds.
    This functions does not disable interrupts, therefore, provides
    smother serial io, however, it is prone to errors when overruns occur.
+   And yet, these functions are perfect for figuring out time
+   while inside of interrupts.
 */
 uint32_t quick_millis();
 uint32_t quick_micros();
+
+// I need this function periodically for debugging.
+void run_next_task();
+
+// Uncomment the following line to switch into tracing mode.
+// In tracing mode, run_next_task() has to be manually invoked.
+
+// #define TRACE_SCHEDULER
 
 #endif
