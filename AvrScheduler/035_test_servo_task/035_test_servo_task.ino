@@ -43,10 +43,9 @@ void setup(){
   angle = (min_angle + max_angle)/2;
   servo_task = add_servo_task(1, ServoPin, angle);
   set_task_wtime(servo_task, 300000); 
-  // up pretty badly.
   callback_task = add_callback_task(2, 20000, update_angle);
   set_task_wtime(callback_task, 300600);
-  checkpoint(quick_micros(), __LINE__);
+  // checkpoint(quick_micros(), __LINE__);
   wake_tasks();
 }
 

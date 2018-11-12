@@ -41,8 +41,6 @@
   
  *** TODO ***
 
-- use uint32_t instead of unsigned long for Period and Ticks.
-- wtime should be Ticks not Period.
 - implement FAST_TRACE_SCHEDULER
 - print tasks in the order they will be invoked.
 - improve logging by allowing a value to be reported.

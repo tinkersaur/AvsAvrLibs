@@ -16,7 +16,7 @@ typedef byte TaskIndex;
 
 typedef byte PinIndex;
 
-typedef unsigned long Period;
+typedef uint32_t Period;
   // ^^^ Must be big enough to contain maximum period. The time is measured in milliseconds.
 
 typedef byte Phase;

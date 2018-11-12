@@ -25,7 +25,7 @@
 #define TR2(key, value) trace(key, value) 
 
 
-typedef unsigned long Ticks; 
+typedef uint32_t Ticks; 
     // ^^^ A tick is a counter of Timer1,
     // which is downscaled from the clock with ratio 64.
 
@@ -67,7 +67,7 @@ enum TaskType{
 
 struct Task{
   uint8_t mode;
-  Period wtime; // wakeup time.
+  Ticks wtime; // wakeup time.
   uint8_t priority;
   TaskParameters params;
   TaskIndex next;
