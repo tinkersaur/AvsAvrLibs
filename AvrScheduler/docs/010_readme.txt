@@ -1,4 +1,4 @@
- Purpose
+ *** Purpose ***
  
  This library enables generating PWM and on several pins to control
  many motors and servos, and run other tasks with a delay or periodically.
