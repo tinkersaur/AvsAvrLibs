@@ -20,9 +20,16 @@
 
 #include"macros.h"
 
-#define ADD_LOG(timestamp, value) checkpoint(timestamp, value) 
-#define CHECKPOINT() checkpoint(quick_micros(), __LINE__) 
-#define TR2(key, value) trace(key, value) 
+//#define FAST_TRACE_SCHEDULER
+#ifdef FAST_TRACE_SCHEDULER
+    #define ADD_LOG(timestamp, value) checkpoint(timestamp, value) 
+    #define CHECKPOINT() checkpoint(quick_micros(), __LINE__) 
+    #define TR2(key, value) trace(key, value) 
+#else 
+    #define ADD_LOG(timestamp, value) 
+    #define CHECKPOINT()
+    #define TR2(key, value)
+#endif
 
 
 typedef uint32_t Ticks; 
@@ -63,7 +70,7 @@ enum TaskType{
   
 // The types can be accoomodated for the application needs.
 
-#define MaxNumTasks 10
+#define MaxNumTasks 20
 
 struct Task{
   uint8_t mode;
@@ -237,7 +244,7 @@ ISR(TIMER1_OVF_vect){
     // the overflow occured, and increment the time1_high_count
 
     // ENTER();
-    CHECKPOINT();
+    // CHECKPOINT();
 
     bool overflow;
     uint32_t clock;
@@ -284,8 +291,9 @@ ISR(TIMER1_OVF_vect){
 
         // ADD_LOG(quick_millis(), 77020);
         // TR2("WT", tasks[next_task].wtime);
-        if (  tasks[next_task].mode != NoTask
-           && tasks[next_task].wtime <= clock){
+        while(  tasks[next_task].mode != NoTask
+           && tasks[next_task].wtime <= clock)
+        {
 
             // CHECKPOINT();
             // ADD_LOG(quick_millis(), clock);
@@ -294,8 +302,6 @@ ISR(TIMER1_OVF_vect){
             run_next_task();
             done = false;
             time_set = false;
-        } else {
-            // CHECKPOINT();
         }
 
         // In the rest of the loop body, we evaluate
@@ -440,7 +446,7 @@ void calcServoTaskWtime(TaskIndex ti){
   // TR(params.phase);
   switch(params.phase){
     case 1:
-      TR2("DU", params.duty);
+      // TR2("DU", params.duty);
       // TR(MinServoDuty);
       // TR(TicksPerServoDutyLevel);
       params.on_duration = params.duty;
@@ -448,7 +454,7 @@ void calcServoTaskWtime(TaskIndex ti){
       task.wtime += params.on_duration;
       break;
     case 0:
-      TR2("DU", params.duty);
+      // TR2("DU", params.duty);
       task.wtime +=  ServoPeriod - params.on_duration;
       break;
     default:
@@ -496,12 +502,12 @@ void executePwmTask(TaskIndex ti){
     case 1:
       params.phase = 0;
       digitalWrite(params.pin, 0);
-      TR2("PN", 0);
+      // TR2("PN", 0);
       break;
     case 0:
       params.phase = 1;
       digitalWrite(params.pin, 1);
-      TR2("PN", 1);
+      // TR2("PN", 1);
       break;
   }
 }
