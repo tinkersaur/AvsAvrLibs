@@ -71,16 +71,12 @@ void wake_tasks();
 
 extern volatile uint16_t timer1_high_count;
 
-#define MaxNumLogs 30
-extern unsigned long logs[MaxNumLogs][2];
-extern uint8_t current_log;
-
 // MinServerDuty and MaxServerDuty must be exposed to to account
 // for variencies in servos.  A user can go a little bit beyond
 // the range to allow for the variation between individaul
 // servos.
 
-#define MinServoDuty 155ul
+#define MinServoDuty 160ul
     // Per data sheet: 0.001 * 16e6 / 64 = 250,
     // 155 is an imperical adjustment.
 
@@ -89,19 +85,6 @@ extern uint8_t current_log;
     //  MaxServoDuty - MinServoDuty should be calculated as
     // 0.001*16e6/64 = 250, however the current value is chosen
     // imperically to fit he servos that I have.
-
-void add_log(unsigned long timestamp, unsigned long info); 
-
-bool logs_full();
-
-/** Other logging forms that could be added later: 
-void add_log(char * three_char_label, int value);
-void add_log(unsigned long timestamp, char * six_char_msg); 
-*/
-
-void report_logs();
-
-void report_tasks();
 
 /** A Quick but inaccurate way of calculating milliseconds.
    This functions does not disable interrupts, therefore, provides
@@ -112,6 +95,8 @@ void report_tasks();
 uint32_t quick_millis();
 uint32_t quick_micros();
 
+
+void report_tasks();
 
 #ifdef TRACE_SCHEDULER
     void simulate_compare_interrupt();  

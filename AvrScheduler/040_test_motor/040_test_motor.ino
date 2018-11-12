@@ -1,4 +1,5 @@
 #include"AvrScheduler.h"
+#include"AvrLog.h"
 
 #define    LeftWheelPwm    5
 #define    LeftWheelPin2   6
@@ -8,12 +9,13 @@ Duty power, dir;
 
 TaskIndex motor_task, power_task;
 
-static const short min_power=1;
-static const short max_power=30;
+static const short min_power=0;
+static const short max_power=10;
 Duty power_step=1;
 bool logs_reported = false;
 
 void update_power(){
+    power += dir;
     if (power>= max_power){
         power = max_power;
         dir = -power_step;
@@ -22,7 +24,6 @@ void update_power(){
         power = min_power;
         dir = power_step;
     }
-    power += dir;
     set_task_duty(motor_task, power);
     // Serial.print("power: ");
     // Serial.println(power);

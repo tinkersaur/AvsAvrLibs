@@ -20,7 +20,10 @@
  
  010_test_one_thread
  020_test_three_threads
- 030_test_servo 
+ 025_test_trigger
+ 030_test_servo   // This is just a proof-of-principle
+                  // prototype for test_servo_task.
+ 035_test_servo_task
  040_test_motor
  050_test_motors_and_servo
  
@@ -38,6 +41,9 @@
   
  *** TODO ***
 
+- use uint32_t instead of unsigned long for Period and Ticks.
+- wtime should be Ticks not Period.
+- implement FAST_TRACE_SCHEDULER
 - print tasks in the order they will be invoked.
 - improve logging by allowing a value to be reported.
 - Motor with duty level 0% or 100% could be excluded from the queue.

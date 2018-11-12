@@ -8,9 +8,9 @@
 #include<assert.h>
 #include<avr/interrupt.h>
 #include<avr/io.h> 
+#include"AvrLog.h"
 
 #define error() Serial.print("Scheduler error at "); Serial.println(__LINE__);
-
 
 #ifdef TRACE_SCHEDULER
     #define TRACE
@@ -18,13 +18,11 @@
     #define SETUP_ISR
 #endif
 
-#define ADD_LOG(timestamp, value) 
-
 #include"macros.h"
 
-
-unsigned long logs[MaxNumLogs][2];
-uint8_t current_log;
+#define ADD_LOG(timestamp, value) checkpoint(timestamp, value) 
+#define CHECKPOINT() checkpoint(quick_micros(), __LINE__) 
+#define TR2(key, value) trace(key, value) 
 
 
 typedef unsigned long Ticks; 
@@ -147,29 +145,6 @@ Period next_task_time(){
     return tasks[next_task].wtime<<2; 
 }
 
-void add_log(unsigned long timestamp, unsigned long info){
-    if (current_log < MaxNumLogs){
-        logs[current_log][0]=timestamp;
-        logs[current_log][1]=info;
-        current_log++;
-    }
-}
-
-bool logs_full(){
-    return current_log >= MaxNumLogs;
-}
-
-void report_logs(){
-    Serial.println("*** Logs ***");
-    for(uint8_t i=0; i<MaxNumLogs; i++){
-        Serial.print(logs[i][0]);
-        Serial.print(" : ");
-        //Serial.print(i==0?0 : (logs[i][0]- logs[i-1][0]));
-        //Serial.print(" : ");
-        Serial.println(logs[i][1]);
-    } 
-}
-
 void wake_tasks(){
    // assert(OCF1A == 1);
    // ENTER();
@@ -261,7 +236,8 @@ ISR(TIMER1_OVF_vect){
     // disabling interrupts. However we need to check if
     // the overflow occured, and increment the time1_high_count
 
-    ENTER();
+    // ENTER();
+    CHECKPOINT();
 
     bool overflow;
     uint32_t clock;
@@ -269,11 +245,11 @@ ISR(TIMER1_OVF_vect){
     //assert(TOV1 ==0);
 
     // TR(TIFR1);
-    ADD_LOG(quick_millis(), 77010);
+    // ADD_LOG(quick_millis(), 77010);
 
     if (TIFR1 & (1<<TOV1)){
-        MSG("Overflow has occured:");
-        ADD_LOG(quick_millis(), 77015);
+        // MSG("Overflow has occured:");
+        // ADD_LOG(quick_millis(), 77015);
         TIFR1 &=~(((uint8_t)1)<<TOV1);
         timer1_high_count++;
     }
@@ -306,21 +282,20 @@ ISR(TIMER1_OVF_vect){
 
         // While it is time to run the top task:
 
-
-        ADD_LOG(quick_millis(), 77020);
-        ADD_LOG(quick_millis(), tasks[next_task].wtime);
+        // ADD_LOG(quick_millis(), 77020);
+        // TR2("WT", tasks[next_task].wtime);
         if (  tasks[next_task].mode != NoTask
            && tasks[next_task].wtime <= clock){
 
-            ADD_LOG(quick_millis(), 77030);
-            ADD_LOG(quick_millis(), clock);
-            MSG("It is time to run the next task:");
-            TR(clock);
+            // CHECKPOINT();
+            // ADD_LOG(quick_millis(), clock);
+            // MSG("It is time to run the next task:");
+            // TR(clock);
             run_next_task();
             done = false;
             time_set = false;
         } else {
-            ADD_LOG(quick_millis(), 77040);
+            // CHECKPOINT();
         }
 
         // In the rest of the loop body, we evaluate
@@ -330,8 +305,8 @@ ISR(TIMER1_OVF_vect){
             // Clear interrupt flag. Page 114:
             TIFR1 &= ~(1<<OCF1A);
 
-            MSG("Setting up the next wakeup time:");
-            TR(tasks[next_task].wtime);
+            // MSG("Setting up the next wakeup time:");
+            // TR(tasks[next_task].wtime);
 
             // Set wakeup time:
             OCR1A = tasks[next_task].wtime & 0xFFFF; 
@@ -347,8 +322,8 @@ ISR(TIMER1_OVF_vect){
             time_set = true;
         }
     }
-    ADD_LOG(quick_millis(), 77050);
-    LEAVE();
+    // ADD_LOG(quick_millis(), 77050);
+    // LEAVE();
 }
 
 void init_tasks(){
@@ -437,25 +412,25 @@ TaskIndex add_motor_task(Priority priority, PinIndex pin, Duty initial_duty){
 }
 
 void calcMotorTaskWtime(TaskIndex ti){
-  ENTER();
+  // ENTER();
   Task & task = tasks[ti];
   PwmParameters & params = tasks[next_task].params.pwm;
-  TR(task.wtime);
-  TR(params.phase);
+  // TR(task.wtime);
+  // TR(params.phase);
   switch(params.phase){
-    case 0:
+    case 1:
       params.on_duration = params.duty * TicksPerMotorDutyLevel;
       task.wtime += params.on_duration;
       break;
-    case 1:
+    case 0:
       task.wtime += MotorPeriod - params.on_duration;
       break;
     default:
       error();
       break;
   }
-  TR(task.wtime);
-  LEAVE();
+  // TR(task.wtime);
+  // LEAVE();
 }
 
 void calcServoTaskWtime(TaskIndex ti){
@@ -464,15 +439,16 @@ void calcServoTaskWtime(TaskIndex ti){
   PwmParameters & params = tasks[next_task].params.pwm;
   // TR(params.phase);
   switch(params.phase){
-    case 0:
-      // TR(params.duty);
+    case 1:
+      TR2("DU", params.duty);
       // TR(MinServoDuty);
       // TR(TicksPerServoDutyLevel);
       params.on_duration = params.duty;
       // TR(params.en_duration);
       task.wtime += params.on_duration;
       break;
-    case 1:
+    case 0:
+      TR2("DU", params.duty);
       task.wtime +=  ServoPeriod - params.on_duration;
       break;
     default:
@@ -517,15 +493,15 @@ TaskIndex set_task_wtime(TaskIndex id, Period t){
 void executePwmTask(TaskIndex ti){
   PwmParameters & params = tasks[next_task].params.pwm;
   switch(params.phase){
-    case 0:
-      params.phase = 1;
-      digitalWrite(params.pin, 1);
-      // ADD_LOG(quick_micros(), 1);
-      break;
     case 1:
       params.phase = 0;
       digitalWrite(params.pin, 0);
-      // ADD_LOG(quick_micros(), 0);
+      TR2("PN", 0);
+      break;
+    case 0:
+      params.phase = 1;
+      digitalWrite(params.pin, 1);
+      TR2("PN", 1);
       break;
   }
 }
