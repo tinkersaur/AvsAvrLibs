@@ -1,8 +1,0 @@
-
-        // Increment the time by a value to account for the
-        // time crack. The time crack is the amount of time required
-        // to compare the time, set up the next wake up time, and
-        // re-enable overflow interrupts.
-
-        // ???
-        

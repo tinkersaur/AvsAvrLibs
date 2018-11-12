@@ -1,0 +1,29 @@
+ 
+ *** MISCELLANEOUS NOTES ***
+
+ Here I put some miscellaneous notes that might be important, but
+ from my personal experience, are not the most interesting thing
+ to read for most people who checked out this this library for
+ the first time.
+
+ First of all, AvrScheduler is not distributed by any company;
+ this is my personal hobby project, I hope there is no confusion
+ there. However this library is very specific to AVR and
+ has really been only tested on Arduino Uno, so I felt that
+ this name is appropriate.
+
+ The other consideration for the name is that, I do not want
+ it to collide with the names in your project, so I might
+ rename it something like AvsAvrScheduler, where Avs are
+ basically random letters (which happened to be my initials),
+ which will help avoid name collisions.
+
+ I intend to make this library useful to others in some way,
+ but I have not decided yet which license would be the best.
+ If you really want to use it in commercial application right
+ away please contact me -- but what are the chances of that?
+ I will make a decision about licensing soon.
+
+
+
+

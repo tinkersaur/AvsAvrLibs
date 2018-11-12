@@ -1,0 +1,50 @@
+ *** Getting started ***
+
+Basically it is a very simple Arduino project with only a few files.
+
+You will need an Arduino board, and an Arduino IDE which you can get
+from https://www.arduino.cc/en/Main/Software.
+
+I am developing this on Linux, so the instructions are for Linux.
+Everythig should work exactly the same on OSX. On Windows, the
+commands would be slightely different, but it should not be hard
+to figuring out what needs to be done.
+
+
+After you checkout the Git repositiory, changed the directory
+
+$ cd AvrScheduler
+
+and run the script
+
+$ ./make_links2.sh
+
+This script creates hard links for each file in AvrScheduler2 in
+an each test directory: 010_test_one_thread, 020_test_three_threads,
+025_test_trigger, et c.
+
+This is done because Arduino IDE does not seem to like soft links.
+Also note, that not all file systems support hard links apparantly.
+
+If you have problems creating these hard links, you can copy over
+the files manually. You would copy those files in your project.
+
+I recommend to start with 010_test_one_thread.  Open the
+direcotry with Arduino IDE, compile and load it to the board.
+Open the "Serial Monitor", you should see the board sending
+you gritting messages:
+
+Time: 262. Hello!
+Time: 499. Hello!
+Time: 999. Hello!
+Time: 1499. Hello!
+Time: 1999. Hello!
+Time: 2499. Hello!
+....
+
+Congradulations, you are through with the hard part! Now you
+checkout the other tests.  These tests can be run if all you have
+is just a board: 020_test_three_threads, 025_test_trigger. The
+other tests would require to have servos, or a motor with an
+H-Bridge.
+
