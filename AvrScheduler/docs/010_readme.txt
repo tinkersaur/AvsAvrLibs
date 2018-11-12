@@ -71,6 +71,12 @@
  080_test_cancel_task // Not implemented.
  090_test_empty_queue // Not implemented.
 
+ *** Getting started ***
+
+ For instructions on how to run tests, pleace read:
+ 
+ AvrScheduler/docs/020_getting_started.txt
+
   
  *** TODO ***
 
