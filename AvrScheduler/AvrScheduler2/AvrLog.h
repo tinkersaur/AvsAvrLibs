@@ -24,7 +24,6 @@ struct MessageRec{
     char msg[7];
 };
 
-
 struct LogRecord{
     uint8_t mode;
     union{
@@ -33,22 +32,25 @@ struct LogRecord{
     } rec;
 };
 
-
 extern LogRecord logs[MaxNumLogs];
 extern uint8_t current_log;
 
-
+/** Log a checkpoint. */
 void checkpoint(uint32_t timestamp, int16_t line_number); 
+
+/** Log a message. */
 void message(char * mssg); 
+
+/** Trace a value. */
 void trace(char * key, int value);
 
+/** Other logging forms that could be added later.
+ */
+
+/** Check if the logging queue is full */
 bool logs_full();
 
-/** Other logging forms that could be added later: 
-void add_log(char * three_char_label, int value);
-void add_log(unsigned long timestamp, char * six_char_msg); 
-*/
-
+/** Report all the current logs through a serial port. */
 void report_logs();
 
 #endif

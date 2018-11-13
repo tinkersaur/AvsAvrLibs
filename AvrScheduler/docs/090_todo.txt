@@ -1,0 +1,41 @@
+
+ *** TODO ***
+
+ I need to read the code carefully. There could be bugs. Also, I
+ need to trace it carefully. Look carefully at the point where
+ COMPA flag is reset.
+- print tasks in the order they will be invoked.
+- improve logging by allowing a value to be reported.
+- Motor with duty level 0% or 100% could be excluded from the queue.
+- Think about a good way to report an error. Right now macro error() reports an error to a serial port.
+- Add a function that reports how much time we got before the next task.
+- dynamic allocation of tasks.
+- in schedule_task(), check if the current position of the task is 
+  good, and no reshuffling required.
+- Driving motors with 100Hz PWM works just fine with the H-Bridge and
+  the motors I have. However playing with these numbers lead to unexpected
+  results. For example: period=5000 and step=20 caused a lot of problems.
+  Need to play more with these constants. 
+- other types of tasks that can be implemented:
+    trigger_boolean:
+        : period
+        : address of a boolean.
+    swipe servo
+        : pin
+        : min angle
+        : max angle
+        : swing duration
+        : pause
+        : offset.
+    servo motions:
+        : pin
+        : num_motion_modes ... mode
+        : num_motion_phases[mode]... phase
+        : position[mode][phase]
+        : time[mode][phase]
+        : offset
+    read_analog:
+        : pin
+        : id
+        : get_task_value(task_id).
+    

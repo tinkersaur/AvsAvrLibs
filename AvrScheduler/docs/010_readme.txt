@@ -1,27 +1,28 @@
  *** Purpose ***
  
- This library enables generating PWM and on several pins to control
- many motors and servos, and run other tasks with a delay or periodically.
+ An AVR micro-controller has several timers which allows it to
+ control two motors or six servos.  The purpose of this library
+ is to explore possibility to control many more motors and servos
+ by flipping the pins in small functions which are scheduled to
+ be invoked in an exactly specified time.
 
  *** Author ***
 
 (C) 2018 Andrey Sobol. All rights reserved.
 
-
  *** Status ***
 
- Most of functionality has been implemented and tested, however
- the desired goal has not been achieved.
+ Most of functionality is implemented and tested, and the logic
+ seems to be correct, but I still see too much jitter.  It could
+ be due to some bugs, and I need to test the code carefully.
+ Perhaps a little optimization can solve the problem.
 
- I see a lot of jitter. It could be just due to some bugs.
- I need to read the code carefully. There could be bugs. Also, I
- need to trace it carefully. Look carefully at the point where
- COMPA flag is reset.
+ Yet this library can be used to schedule the tasks that are not
+ so sensitive to time. (To control servos, I need precision under
+ 10 microseconds.)
  
- I no bugs are to be found, the following would be my conclusion.
-
  In my first attempt I implemented a task scheduler; it was
- relying on function millis(); I did not go into intterupts and
+ relying on function millis(); I did not go into interrupts and
  timers at that stage.
 
  I was able to drive 2 motors and a servo, but there was some
@@ -29,12 +30,10 @@
  swing is not the same as it was without the motors. Should try
  to use different timers.
 
- Also serial communication might be messing with millis() too,
- and this further deteriorated the quality.  An attempt has been
- made to use Timer1 and interrupts.
-
- The library was intended to work together with serial communication. 
- So this approach has failed.
+ Also serial communication interferes with millis() too, and this
+ further deteriorated the quality.  The library was intended to
+ work together with serial communication.  So this approach has
+ failed. An attempt has been made to use Timer1 and interrupts.
 
  In my second attempt, I relied on timer1 (a 16bit timer). A servo 
  could be controlled in isolation, just fine. Two motors could be
@@ -42,13 +41,13 @@
  and an one additional task turned out too much for this little
  chip.
  
- It seems that it did not fail by much, and a small otpimization
+ It seems that it did not fail by much, and a small optimization
  might improve the quality significantly.
 
  However this would still keep MCU very busy, and for the purposes of
  this project it must remain responsive. For my particular
- project it is better just to use an additonal MCU.  There are
- other possible future directions which might be more promissing;
+ project it is better just to use an additional MCU.  There are
+ other possible future directions which might be more promising;
  see below.
 
  *** Tests ***
@@ -73,62 +72,32 @@
 
  *** Getting started ***
 
- For instructions on how to run tests, pleace read:
+ For instructions on how to run tests, please read:
  
  AvrScheduler/docs/020_getting_started.txt
 
-  
- *** TODO ***
+ *** Other documentation ***
 
-- read the code carefully. there could be bugs. trace it
-  carefully.
-- print tasks in the order they will be invoked.
-- improve logging by allowing a value to be reported.
-- Motor with duty level 0% or 100% could be excluded from the queue.
-- Think about a good way to report an error. Right now macro error() reports an error to a serial port.
-- Add a function that reports how much time we got before the next task.
-- dynamic allocation of tasks.
-- in schedule_task(), check if the current position of the task is 
-  good, and no reshuffling required.
-- Driving motors with 100Hz PWM works just fine with the H-Bridge and
-  the motors I have. However playing with these numbers lead to unexpected
-  results. for example: period=5000 and step=20 caused a lot of problems.
-  Need to play more with these constants. 
-- other types of tasks that can be implemented:
-    trigger_boolean:
-        : period
-        : address of a boolean.
-    swipe servo
-        : pin
-        : min angle
-        : max angle
-        : swing duration
-        : pause
-        : offset.
-    servo motions:
-        : pin
-        : num_motion_modes ... mode
-        : num_motion_phases[mode]... phase
-        : position[mode][phase]
-        : time[mode][phase]
-        : offset
-    read_analog:
-        : pin
-        : id
-        : get_task_value(task_id).
-    
+ This file is intended to be very short. See other documentation in
+ folder AvrScheduler/docs/.
+  
 *** Usage notes ***
 
 - The library has "#define TRACE_SCHEDULER" which
-can switch the code into a mode which is much easier to debug.
+  can switch the code into a mode which is much easier to debug.
 
-*** Notes, and Observations ****
+*** Notes and Observations ****
+
+- Note that PWM for controlling servo is different from
+  controlling a motor.  PWM for motor has 500Hz and duty cycle 0
+  to 100%.  Servo is controlled at 50Hz, and has a duty cycle
+  between 1ms to 2ms.
 
 - inline keyword is ignored.
 
 - Staggering tasks (using set_task_wtime()) is very important. Almost
-  does not work without it, but works well with it. Emperically,
-  stuggering them by 100-200 is good. The value depends on the
+  does not work without it, but works well with it. Empirically,
+  staggering them by 100-200 is good. The value depends on the
   size of the queue.
 
 - Arduino documentation says that only two pins can be configured
@@ -147,7 +116,7 @@ can switch the code into a mode which is much easier to debug.
   Be careful to not to confuse these two symbols.
 
 - Driving motors with 100Hz PWM works just fine with the H-Bridge
-  and the motors I have. Need to experiemnt more with those
+  and the motors I have. Need to experiment more with those
   numbers.
 
 *** Future directions ***
@@ -161,22 +130,18 @@ can switch the code into a mode which is much easier to debug.
   occur when the duty changes. The problem however is that
   the motors and servos have different main frequencies.
   This can be remedied though in several ways:
-    - Obviouls but most cumbersome option is to have two
+    - Obvious but most cumbersome option is to have two
       queues: one for motors and one for servos.
-    - With the H-bridge that I have, I have observed that
-      (a) it might be possible to feed it with 50Hz just
-      fine, and (b) it requires much less that 100% duty
-      to exert the full power. It might be possible to
-      control it just like the servo. Need to read the
-      documentation.
+    - With the H-bridge that I have, I have observed that (a) it
+      might be possible to feed it with 50Hz just fine, and (b)
+      it requires much less that 100% duty to exert the full
+      power. It might be possible to control it just like the
+      servo. Need to read the documentation.
     - Use one board for a bunch of servos and another 
       board for a bunch of motors.
 
 *** Links ***
   
- Note that PWM for controlling servo is different from controlling a motor.
- PWM for motor has 500Hz and duty cycle 0 to 100%.
- Servo is controlled at 50Hz. and has a duty cycle between 1ms to 2ms.
 
  https://github.com/arduino/Arduino/
  https://www.arduino.cc/en/Tutorial/SecretsOfArduinoPWM

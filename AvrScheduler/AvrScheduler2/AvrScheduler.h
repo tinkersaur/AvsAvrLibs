@@ -6,7 +6,6 @@
 /** Updated on 2018-10-28 12:11 */
 #include<stdint.h>
 
-
 // Uncomment the following line to switch into tracing mode.
 // In tracing mode, run_next_task() has to be manually invoked.
 // #define TRACE_SCHEDULER
@@ -87,11 +86,11 @@ extern volatile uint16_t timer1_high_count;
     // imperically to fit he servos that I have.
 
 /** A Quick but inaccurate way of calculating milliseconds.
-   This functions does not disable interrupts, therefore, provides
-   smother serial io, however, it is prone to errors when overruns occur.
-   And yet, these functions are perfect for figuring out time
-   while inside of interrupts.
-*/
+ *  This functions does not disable interrupts, therefore, provides
+ *  smother serial io, however, it is prone to errors when overruns occur.
+ *  And yet, these functions are perfect for figuring out time
+ *  while inside of interrupts.
+ */
 uint32_t quick_millis();
 uint32_t quick_micros();
 
